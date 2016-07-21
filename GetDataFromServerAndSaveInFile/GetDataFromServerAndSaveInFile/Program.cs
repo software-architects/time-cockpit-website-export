@@ -75,7 +75,7 @@ namespace GetDataFromServerAndSaveInFile
 
                         DownloadData(urlDataTableMediaFile);
 
-                        MakeBlog(dataTableBlogEntriesGerman, "DeBlogRootUrl");
+                        //MakeBlog(dataTableBlogEntriesGerman, "DeBlogRootUrl");
 
                         german = false;
 
@@ -97,7 +97,7 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void MakeBlog(DataTable dt, string blogUrl)
         {
-            for (int i = 228; i < dt.Rows.Count-70; i++)
+            for (int i = 17; i < dt.Rows.Count; i++)
             {
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
@@ -120,11 +120,9 @@ namespace GetDataFromServerAndSaveInFile
 
                 var fullpath = $"{path}/{dt.Rows[i]["titleUrl"]}";
 
-                if (date.Year == 2015 && date.Month == 12)
-                {
-                    Console.WriteLine(i);
-                    Console.WriteLine(path);
-                }
+                Console.WriteLine(i);
+                Console.WriteLine(fullpath);
+
                 using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[blogUrl]}{fullpath}.md"))
                 {
                     SetHeader(sw, dt, i, fullpath);
@@ -273,9 +271,7 @@ namespace GetDataFromServerAndSaveInFile
             }
 
 			if (fullPath == "/home/")
-			{
 				fullPath = "/";
-			}
 
             if (german)
                 sw.WriteLine($"permalink: /de{fullPath}");
@@ -292,74 +288,64 @@ namespace GetDataFromServerAndSaveInFile
             var xnm = new XmlNamespaceManager(new NameTable());
             xnm.AddNamespace("x", "http://www.w3.org/1999/xhtml");
 
-            var nodes = document.XPathSelectElement("/x:html/x:body", xnm).Nodes();
+            var nodes = document.XPathSelectElement("/x:html/x:body", xnm).Elements();
 
-            var code = "";
-            var fullCode = "";
-            var newTextForFile = "";
-
-            if (blog)
+            foreach (var xe in nodes)
             {
-                foreach (XElement xe in nodes)
+                var xeString = xe.ToString();
+
+                xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
+
+                xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPages);
+
+                if (blog)
                 {
-                    var xeNodes = xe.Elements();
+                    var fullCode = xeString;
+                    var allResults = Regex.Matches(fullCode, @"(<f:function\s{1}name=\x22Composite\.Web\.Html\.SyntaxHighlighter\x22)(.|\W|\s)+(<\/f:function>)");
 
-                    foreach (var singleXe in xeNodes)
+                    if (allResults.Count != 0)
                     {
-                        //({<f:function)[[:ascii:]]+(<\/f:function>})
-                        //
-                        var help = singleXe.ToString();
+                        var code = "";
 
-                        if (Regex.IsMatch(help, @"(<f:function)(.|\W|\s)+(<\/f:function>)"))
+                        foreach (var item in allResults)
                         {
+                            var help = item.ToString();
 
-                            var paramNodes = Regex.Matches(help, @"(<f:param).+?(\/>)");
+                            var paramNodes = Regex.Matches(help, @"(<f:param\s{1}name=\x22SourceCode\x22).+?(\/>)");
 
-                            foreach (var singleParam in paramNodes)
+                            if (paramNodes.Count != 0)
                             {
-                                var valueNodes = Regex.Matches(singleParam.ToString(), @"(value=\W?).+?(\x22)");
-
-                                foreach (var singleValue in valueNodes)
+                                foreach (var singleParam in paramNodes)
                                 {
-                                    code = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)")[0].Value;
+                                    var valueNodes = Regex.Matches(singleParam.ToString(), @"(value=\W?).+?(\x22)");
 
-                                    code = code.Replace("\x22", string.Empty);
+                                    foreach (var singleValue in valueNodes)
+                                    {
+                                        code = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)")[0].Value;
 
-                                    var highlight = "{% highlight javascript}";
+                                        var test = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)");
 
-                                    var highlightEnd = "{% endhighlight javascript }";
+                                        if (code.StartsWith("\x22") && code.EndsWith("\x22"))
+                                        {
+                                            code = code.Substring(1, code.Length - 1);
+                                            code = code.Remove(code.Length - 1);
+                                        }
 
-                                    var newCode = $"{highlight}{code}{highlightEnd}";
+                                        var highlight = "{% highlight javascript}";
 
-                                    fullCode = xe.ToString();
+                                        var highlightEnd = "{% endhighlight javascript }";
 
-                                    newTextForFile = fullCode.Replace(help.ToString(), newCode.ToString()).ToString();
+                                        var newCode = $"{highlight}{code}{highlightEnd}";
 
-                                   
-
+                                        xeString = fullCode.Replace(help, newCode);
+                                        Console.WriteLine("HIER");
+                                    }
                                 }
                             }
                         }
                     }
                 }
-
-                foreach (XNode xe in nodes)
-                {
-                    var xeString = xe.ToString();
-
-                    xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
-
-                    xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPages);
-
-                    if (blog)
-                    {
-
-
-                    }
-
-
-                    sw.Write(xeString);
-                }
+                sw.Write(xeString);
             }
         }
 
