@@ -1,0 +1,363 @@
+﻿using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.IO;
+using System.Xml;
+using System.Xml.Linq;
+using System.Xml.XPath;
+using System.Configuration;
+using System.Text.RegularExpressions;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net;
+
+namespace GetDataFromServerAndSaveInFile
+{
+    public class Program
+    {
+        private static bool german = true;
+        private static bool blog = true;
+        private static Dictionary<string, string> idWithPathsPages = new Dictionary<string, string>();
+        private static Dictionary<string, string> idWithPathsData = new Dictionary<string, string>();
+
+        public static void Main(string[] args)
+        {
+            using (var conn = new SqlConnection())
+            {
+                conn.ConnectionString = ConfigurationManager.AppSettings["ConnectString"];
+                conn.Open();
+
+                var pageGerman = @"SELECT p.id,p.title,p.menutitle,p.urlTitle,p.friendlyUrl,p.description,pp.placeHolderId,pp.content FROM Composite_Data_Types_IPage_Published_de_AT p inner join Composite_Data_Types_IPagePlaceholderContent_Published_de_AT pp on pp.pageid = p.id order by p.id, pp.placeholderid desc;";
+                var urlGerman = @"with pages as (select s.id, 0 as level, cast(pn.UrlTitle as nvarchar(max)) as urltitle from [dbo].[Composite_Data_Types_IPageStructure_Published] s inner join [Composite_Data_Types_IPage_Published_de_AT] pn on pn.id = s.id where parentid = '00000000-0000-0000-0000-000000000000'union all select  p1.id, p0.level + 1, p0.urltitle + '/' + cast(pn.UrlTitle as nvarchar(max)) as urltitle from Composite_Data_Types_IPageStructure_Published p1 inner join pages p0 on p0.id = p1.parentid inner join Composite_Data_Types_IPage_Published_de_AT pn on pn.id = p1.id) select * from pages";
+
+                var pageEnglish = @"SELECT p.id,p.title,p.menutitle,p.urlTitle,p.friendlyUrl,p.description,pp.placeHolderId,pp.content FROM Composite_Data_Types_IPage_Published_en_US p inner join Composite_Data_Types_IPagePlaceholderContent_Published_en_US pp on pp.pageid = p.id order by p.id, pp.placeholderid desc";
+                var urlEnglish = @"with pages as (select s.id, 0 as level, cast(pn.UrlTitle as nvarchar(max)) as urltitle from [dbo].[Composite_Data_Types_IPageStructure_Published] s inner join Composite_Data_Types_IPage_Published_en_US pn on pn.id = s.id where parentid = '00000000-0000-0000-0000-000000000000' union all select  p1.id, p0.level + 1, p0.urltitle + '/' + cast(pn.UrlTitle as nvarchar(max)) as urltitle from Composite_Data_Types_IPageStructure_Published p1 inner join pages p0 on p0.id = p1.parentid inner join Composite_Data_Types_IPage_Published_en_US pn on pn.id = p1.id) select * from pages;";
+
+                var mediaFile = @"select id, folderPath, fileName from Composite_Data_Types_IMediaFileData_Published;";
+
+                var blogEntriesGerman = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.date,p.Author,p.Content ,pp.name FROM Composite_Community_Blog_Entries_de_AT p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
+                var blogEntriesEnglish = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.date,p.Author,p.Content ,pp.name FROM Composite_Community_Blog_Entries_en_US p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id; ";
+
+                using (var dataEnglish = new SqlDataAdapter(pageEnglish, conn))
+                using (var urlDataEnglish = new SqlDataAdapter(urlEnglish, conn))
+                using (var dataGerman = new SqlDataAdapter(pageGerman, conn))
+                using (var urlDataGerman = new SqlDataAdapter(urlGerman, conn))
+                using (var urlDataMediaFile = new SqlDataAdapter(mediaFile, conn))
+                using (var dataBlogEntriesGerman = new SqlDataAdapter(blogEntriesGerman, conn))
+                using (var dataBlogEntriesEnglish = new SqlDataAdapter(blogEntriesEnglish, conn))
+                {
+                    using (var dataTableEnglish = new DataTable())
+                    using (var urlDataTableEnglish = new DataTable())
+                    using (var dataTableGerman = new DataTable())
+                    using (var urlDataTableGerman = new DataTable())
+                    using (var urlDataTableMediaFile = new DataTable())
+                    using (var dataTableBlogEntriesGerman = new DataTable())
+                    using (var dataTableBlogEntriesEnglish = new DataTable())
+                    {
+                        dataEnglish.Fill(dataTableEnglish);
+                        urlDataEnglish.Fill(urlDataTableEnglish);
+
+                        dataGerman.Fill(dataTableGerman);
+                        urlDataGerman.Fill(urlDataTableGerman);
+
+                        urlDataMediaFile.Fill(urlDataTableMediaFile);
+
+                        dataBlogEntriesGerman.Fill(dataTableBlogEntriesGerman);
+                        dataBlogEntriesEnglish.Fill(dataTableBlogEntriesEnglish);
+
+                        FillDictionary(dataTableGerman, urlDataTableGerman);
+                        FillDictionary(dataTableEnglish, urlDataTableEnglish);
+
+                        CheckDirectory(ConfigurationManager.AppSettings["DeRootUrl"]);
+                        CheckDirectory(ConfigurationManager.AppSettings["EnRootUrl"]);
+
+                        DownloadData(urlDataTableMediaFile);
+
+                        MakeBlog(dataTableBlogEntriesGerman, "DeBlogRootUrl");
+
+                        german = false;
+
+                        MakeBlog(dataTableBlogEntriesEnglish, "EnBlogRootUrl");
+
+                        german = true;
+                        blog = false;
+
+                        MakeHtml(dataTableGerman, urlDataTableGerman, "DeRootUrl");
+
+                        german = false;
+
+                        MakeHtml(dataTableEnglish, urlDataTableEnglish, "EnRootUrl");
+                    }
+                }
+            }
+            //Console.ReadKey();
+        }
+
+        private static void MakeBlog(DataTable dt, string blogUrl)
+        {
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
+
+                var path = "";
+
+                if (date.Month.ToString().Length == 1)
+                {
+                    var month = $"0{date.Month}";
+                    path = $"/{date.Year}/{month}/{date.Day}";
+                }
+                else if(date.Day.ToString().Length == 1)
+                {
+                    var day = $"0{date.Day}";
+                    path = $"/{date.Year}/{date.Month}/{day}";
+                }
+                else
+                    path = $"/{date.Year}/{date.Month}/{date.Day}";
+
+                CheckDirectory($"{ConfigurationManager.AppSettings[blogUrl]}{path}");
+
+                var fullpath = $"{path}/{dt.Rows[i]["titleUrl"]}";
+
+                using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[blogUrl]}{fullpath}.md"))
+                {
+                    SetHeader(sw, dt, i, fullpath);
+                    ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
+                }
+            }
+        }
+
+        private static void DownloadData(DataTable dt)
+        {
+            using (var client = new WebClient())
+            {
+                client.BaseAddress = ConfigurationManager.AppSettings["TimecockpitUrl"];
+
+                for (int i = 0; i < dt.Rows.Count; i++)
+                {
+                    var help = dt.Rows[i]["folderPath"].ToString().Split('/');
+                    var folder = "";
+
+                    for (int j = 0; j < help.Length; j++)
+                    {
+                        if (help[j] == "time_cockpit")
+                            folder += "images/";
+                        else if (help[j] != string.Empty)
+                            folder += $"{help[j]}/";
+                    }
+                    var path = $"{folder}{dt.Rows[i]["fileName"]}";
+
+                    idWithPathsData.Add(dt.Rows[i]["id"].ToString(),path);
+
+                    var fullPath = $"{ConfigurationManager.AppSettings["RootUrl"]}{folder}";
+
+                    CheckDirectory(fullPath);
+
+                    fullPath = $"{fullPath}{dt.Rows[i]["fileName"]}";
+
+                    if (!CheckFile(fullPath))
+                    {
+                        var data = client.DownloadData(dt.Rows[i]["id"].ToString());
+                        File.WriteAllBytes(fullPath, data);
+                    }
+                }
+            }
+        }   
+
+        private static void FillDictionary(DataTable dt, DataTable urlDt)
+        {
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                var foundrow = urlDt.Select($"id = '{dt.Rows[i]["id"]}'");
+
+                var splitUrl = GetUrlTitle(foundrow[0]["urltitle"].ToString());
+
+                var folderPath = "/";
+                var helpPath = "";
+                var fileName = "";
+
+                if (splitUrl.Length == 1)
+                    fileName = "home";
+                else
+                {
+                    for (int j = 0; j < splitUrl.Length - 1; j++)
+                    {
+                        if (splitUrl[j] != string.Empty)
+                            folderPath += splitUrl[j] + "/";
+                    }
+                    fileName = splitUrl[splitUrl.Length - 1];
+                }
+                helpPath = $"{folderPath}{fileName}/";
+
+                if (!idWithPathsPages.ContainsKey(foundrow[0]["id"].ToString()))
+                    idWithPathsPages.Add(foundrow[0]["id"].ToString(), helpPath);
+            }
+        }
+
+        private static void MakeHtml(DataTable dt, DataTable urlDt, string rootUrl)
+        {
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                var foundrow = urlDt.Select($"id = '{dt.Rows[i]["id"]}'");
+
+                var splitUrl = GetUrlTitle(foundrow[0]["urltitle"].ToString());
+
+                var folderPath = "/";
+                var helpPath = "";
+                var fileName = "";
+
+                if (splitUrl.Length == 1)
+                    fileName = "home";
+                else { 
+                    for (int j = 0; j < splitUrl.Length - 1; j++)
+                    {
+                        if (splitUrl[j] != string.Empty)
+                            folderPath += splitUrl[j] + "/";
+                    }
+                    fileName = splitUrl[splitUrl.Length - 1];
+                }
+                helpPath = $"{folderPath}{fileName}/";
+
+                if (dt.Rows[i]["placeholderid"].ToString() == "content")
+                {
+                    CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}");
+
+                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}{fileName}.md"))
+                    {
+                        SetHeader(sw, dt, i, helpPath);
+                        ContentSeperatorAndSetter(sw,dt.Rows[i]["content"].ToString());
+                    }
+                }
+                else
+                {
+                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}{fileName}.md", true))
+                        ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
+                }
+            }
+        }
+
+        private static void SetHeader(StreamWriter sw, DataTable dt,int index, string fullPath)
+        {
+            var titleConvert = dt.Rows[index]["title"].ToString().Replace(':', ',');
+
+            sw.WriteLine("---");
+
+            if (blog)
+            {
+                sw.WriteLine("layout: blog");
+                sw.WriteLine($"title: {titleConvert}");
+                sw.WriteLine($"author: {dt.Rows[index]["name"]}");
+
+                var imageUrl = "";
+
+                if (dt.Rows[index]["image"].ToString() != string.Empty)
+                {
+                    var guid = dt.Rows[index]["image"].ToString().Substring(13);
+
+                    if (idWithPathsData.ContainsKey(guid))
+                        imageUrl = idWithPathsData[guid];
+
+                    sw.WriteLine($"bannerimage: /{imageUrl}");
+                }
+                else
+                    sw.WriteLine($"bannerimage: {imageUrl}");
+            }
+            else
+            {
+                sw.WriteLine("layout: page");
+                sw.WriteLine($"title: {titleConvert}");
+            }
+
+			if (fullPath == "/home/")
+			{
+				fullPath = "/";
+			}
+
+            if (german)
+                sw.WriteLine($"permalink: /de{fullPath}");
+            else
+                sw.WriteLine($"permalink: {fullPath}");
+
+            sw.WriteLine("---");
+            sw.WriteLine();
+        }
+
+        private static void ContentSeperatorAndSetter(StreamWriter sw,string content)
+        {
+            var document = XDocument.Parse(content);
+            var xnm = new XmlNamespaceManager(new NameTable());
+            xnm.AddNamespace("x", "http://www.w3.org/1999/xhtml");
+
+            var nodes = document.XPathSelectElement("/x:html/x:body", xnm).Nodes();
+
+            foreach (XNode xe in nodes)
+            {
+                var xeString = xe.ToString();
+
+                xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
+
+                xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPages);
+
+                //if (blog)
+                //{
+                //    var help = Regex.Split(xeString, @"^(<f:function){1}.+(<\/f:function>){1}");
+
+                //    if(help.Length > 1)
+                //    {
+
+                //    }
+                //}
+
+
+                sw.Write(xeString);
+            }
+        }
+
+        private static string MakeHyperLink(string content,string pattern, Dictionary<string,string> ids)
+        {
+            var guid = Regex.Matches(content, pattern);
+
+            if (guid.Count == 0)
+                return content;
+            else
+            {
+                foreach (var id in guid)
+                {
+                    var idString = id.ToString();
+
+                    if (idString.StartsWith("~"))
+                        idString = idString.Substring(1);
+
+                    var singleGuid = idString.Substring(idString.IndexOf('(') + 1, 36);
+
+                    if (ids.ContainsKey(singleGuid))
+                    {
+                        content = content.Replace("~", string.Empty);
+                        content = content.Replace(idString, "{{site.baseurl}}" + ids[singleGuid]);
+                    }
+                    else
+                        Console.WriteLine($"{idString} nicht verfügbar");
+                }
+                return content;
+            }
+        }
+
+        private static void CheckDirectory(string path)
+        {
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+        }
+
+        private static bool CheckFile(string path)
+        {
+            if (File.Exists(path)) return true;
+            else return false;
+        }
+
+        private static string[] GetUrlTitle(string urlTitle)
+        {
+            return Regex.Split(urlTitle,"/");
+        }
+    }
+}

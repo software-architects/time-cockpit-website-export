@@ -2,4 +2,6 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/GetDataFromServerAndSaveInFile/.vs/GetDataFromServerAndSaveInFile
+/GetDataFromServerAndSaveInFile/GetDataFromServerAndSaveInFile/obj/Debug
+/GetDataFromServerAndSaveInFile/GetDataFromServerAndSaveInFile/bin/Debug
+/GetDataFromServerAndSaveInFile/GetDataFromServerAndSaveInFile/MyConfig.config
