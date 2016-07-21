@@ -97,7 +97,7 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void MakeBlog(DataTable dt, string blogUrl)
         {
-            for (int i = 0; i < dt.Rows.Count; i++)
+            for (int i = 228; i < dt.Rows.Count-70; i++)
             {
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
@@ -120,6 +120,11 @@ namespace GetDataFromServerAndSaveInFile
 
                 var fullpath = $"{path}/{dt.Rows[i]["titleUrl"]}";
 
+                if (date.Year == 2015 && date.Month == 12)
+                {
+                    Console.WriteLine(i);
+                    Console.WriteLine(path);
+                }
                 using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[blogUrl]}{fullpath}.md"))
                 {
                     SetHeader(sw, dt, i, fullpath);
@@ -137,7 +142,7 @@ namespace GetDataFromServerAndSaveInFile
                 for (int i = 0; i < dt.Rows.Count; i++)
                 {
                     var help = dt.Rows[i]["folderPath"].ToString().Split('/');
-                    var folder = "";
+                    var folder = "/";
 
                     for (int j = 0; j < help.Length; j++)
                     {
@@ -218,7 +223,7 @@ namespace GetDataFromServerAndSaveInFile
                     fileName = splitUrl[splitUrl.Length - 1];
                 }
                 helpPath = $"{folderPath}{fileName}/";
-
+                
                 if (dt.Rows[i]["placeholderid"].ToString() == "content")
                 {
                     CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}");
@@ -257,11 +262,9 @@ namespace GetDataFromServerAndSaveInFile
 
                     if (idWithPathsData.ContainsKey(guid))
                         imageUrl = idWithPathsData[guid];
-
-                    sw.WriteLine($"bannerimage: /{imageUrl}");
                 }
-                else
-                    sw.WriteLine($"bannerimage: {imageUrl}");
+
+                sw.WriteLine($"bannerimage: {imageUrl}");
             }
             else
             {
@@ -283,7 +286,7 @@ namespace GetDataFromServerAndSaveInFile
             sw.WriteLine();
         }
 
-        private static void ContentSeperatorAndSetter(StreamWriter sw,string content)
+        private static void ContentSeperatorAndSetter(StreamWriter sw, string content)
         {
             var document = XDocument.Parse(content);
             var xnm = new XmlNamespaceManager(new NameTable());
@@ -291,26 +294,72 @@ namespace GetDataFromServerAndSaveInFile
 
             var nodes = document.XPathSelectElement("/x:html/x:body", xnm).Nodes();
 
-            foreach (XNode xe in nodes)
+            var code = "";
+            var fullCode = "";
+            var newTextForFile = "";
+
+            if (blog)
             {
-                var xeString = xe.ToString();
+                foreach (XElement xe in nodes)
+                {
+                    var xeNodes = xe.Elements();
 
-                xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
+                    foreach (var singleXe in xeNodes)
+                    {
+                        //({<f:function)[[:ascii:]]+(<\/f:function>})
+                        //
+                        var help = singleXe.ToString();
 
-                xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPages);
+                        if (Regex.IsMatch(help, @"(<f:function)(.|\W|\s)+(<\/f:function>)"))
+                        {
 
-                //if (blog)
-                //{
-                //    var help = Regex.Split(xeString, @"^(<f:function){1}.+(<\/f:function>){1}");
+                            var paramNodes = Regex.Matches(help, @"(<f:param).+?(\/>)");
 
-                //    if(help.Length > 1)
-                //    {
+                            foreach (var singleParam in paramNodes)
+                            {
+                                var valueNodes = Regex.Matches(singleParam.ToString(), @"(value=\W?).+?(\x22)");
 
-                //    }
-                //}
+                                foreach (var singleValue in valueNodes)
+                                {
+                                    code = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)")[0].Value;
+
+                                    code = code.Replace("\x22", string.Empty);
+
+                                    var highlight = "{% highlight javascript}";
+
+                                    var highlightEnd = "{% endhighlight javascript }";
+
+                                    var newCode = $"{highlight}{code}{highlightEnd}";
+
+                                    fullCode = xe.ToString();
+
+                                    newTextForFile = fullCode.Replace(help.ToString(), newCode.ToString()).ToString();
+
+                                   
+
+                                }
+                            }
+                        }
+                    }
+                }
+
+                foreach (XNode xe in nodes)
+                {
+                    var xeString = xe.ToString();
+
+                    xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
+
+                    xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPages);
+
+                    if (blog)
+                    {
 
 
-                sw.Write(xeString);
+                    }
+
+
+                    sw.Write(xeString);
+                }
             }
         }
 
