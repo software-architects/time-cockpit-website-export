@@ -280,8 +280,7 @@ namespace GetDataFromServerAndSaveInFile
 
             if (blog)
             {
-                var teaser = dt.Rows[index]["teaser"].ToString().Replace(":", " - ");
-                teaser = teaser.Replace("\r\n", " ");
+                var teaser = dt.Rows[index]["teaser"].ToString().Replace(":", " - ").Replace("\n", " ");
                 var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-MM-dd");
                 var language = dt.Rows[index]["SourceCultureName"].ToString().Substring(0, 2);
                 var reference = "";
