@@ -75,11 +75,11 @@ namespace GetDataFromServerAndSaveInFile
 
                         DownloadData(urlDataTableMediaFile);
 
-                        //MakeBlog(dataTableBlogEntriesGerman, "DeBlogRootUrl");
+                        MakeBlog(dataTableBlogEntriesGerman, "DeRootUrl");
 
                         german = false;
 
-                        MakeBlog(dataTableBlogEntriesEnglish, "EnBlogRootUrl");
+                        MakeBlog(dataTableBlogEntriesEnglish, "EnRootUrl");
 
                         german = true;
                         blog = false;
@@ -95,35 +95,32 @@ namespace GetDataFromServerAndSaveInFile
             //Console.ReadKey();
         }
 
-        private static void MakeBlog(DataTable dt, string blogUrl)
+        private static void MakeBlog(DataTable dt, string rootUrl)
         {
             for (int i = 0; i < dt.Rows.Count; i++)
             {
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
-                var path = "";
+                var path = "/blog/";
 
                 if (date.Month.ToString().Length == 1)
                 {
                     var month = $"0{date.Month}";
-                    path = $"/{date.Year}/{month}/{date.Day}";
+                    path += $"{date.Year}/{month}/{date.Day}";
                 }
                 else if(date.Day.ToString().Length == 1)
                 {
                     var day = $"0{date.Day}";
-                    path = $"/{date.Year}/{date.Month}/{day}";
+                    path += $"{date.Year}/{date.Month}/{day}";
                 }
                 else
-                    path = $"/{date.Year}/{date.Month}/{date.Day}";
+                    path += $"{date.Year}/{date.Month}/{date.Day}";
 
-                CheckDirectory($"{ConfigurationManager.AppSettings[blogUrl]}{path}");
+                CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{path}");
 
                 var fullpath = $"{path}/{dt.Rows[i]["titleUrl"]}";
-
-                Console.WriteLine(i);
-                Console.WriteLine(fullpath);
-
-                using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[blogUrl]}{fullpath}.md"))
+                
+                using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{fullpath}.md"))
                 {
                     SetHeader(sw, dt, i, fullpath);
                     ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
@@ -140,7 +137,7 @@ namespace GetDataFromServerAndSaveInFile
                 for (int i = 0; i < dt.Rows.Count; i++)
                 {
                     var help = dt.Rows[i]["folderPath"].ToString().Split('/');
-                    var folder = "/";
+                    var folder = "";
 
                     for (int j = 0; j < help.Length; j++)
                     {
@@ -149,7 +146,7 @@ namespace GetDataFromServerAndSaveInFile
                         else if (help[j] != string.Empty)
                             folder += $"{help[j]}/";
                     }
-                    var path = $"{folder}{dt.Rows[i]["fileName"]}";
+                    var path = $"/content/{folder}{dt.Rows[i]["fileName"]}";
 
                     idWithPathsData.Add(dt.Rows[i]["id"].ToString(),path);
 
@@ -248,9 +245,13 @@ namespace GetDataFromServerAndSaveInFile
 
             if (blog)
             {
+                var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-mm-dd");
+
                 sw.WriteLine("layout: blog");
                 sw.WriteLine($"title: {titleConvert}");
+                sw.WriteLine($"teaser: {dt.Rows[index]["teaser"]}");
                 sw.WriteLine($"author: {dt.Rows[index]["name"]}");
+                sw.WriteLine($"date: {date}");
 
                 var imageUrl = "";
 
@@ -333,12 +334,11 @@ namespace GetDataFromServerAndSaveInFile
 
                                         var highlight = "{% highlight javascript}";
 
-                                        var highlightEnd = "{% endhighlight javascript }";
+                                        var highlightEnd = "{% endhighlight %}";
 
                                         var newCode = $"{highlight}{code}{highlightEnd}";
 
                                         xeString = fullCode.Replace(help, newCode);
-                                        Console.WriteLine("HIER");
                                     }
                                 }
                             }
