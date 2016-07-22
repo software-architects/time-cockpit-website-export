@@ -121,7 +121,7 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void MakeBlog(DataTable dt, string rootUrl)
         {
-            for (int i = 0; i < dt.Rows.Count; i++)
+            for (int i = 166; i < dt.Rows.Count-132; i++)
             {
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
@@ -358,53 +358,55 @@ namespace GetDataFromServerAndSaveInFile
                 xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPages);
 
                 if (blog)
+                    xeString = MakeHighLight(xeString);
+
+                sw.Write(xeString);
+            }
+        }
+
+        private static string MakeHighLight(string xeString)
+        {
+            var fullCode = xeString;
+            var allResults = Regex.Matches(fullCode, @"(<f:function\s{1}name=\x22Composite\.Web\.Html\.SyntaxHighlighter\x22)(.|\W|\s)+?(<\/f:function>)");
+            var code = "";
+
+            foreach (var item in allResults)
+            {
+                var help = item.ToString();
+
+                var paramNodes = Regex.Matches(help, @"(<f:param\s{1}name=\x22SourceCode\x22).+?(\/>)");
+
+                if (paramNodes.Count != 0)
                 {
-                    var fullCode = xeString;
-                    var allResults = Regex.Matches(fullCode, @"(<f:function\s{1}name=\x22Composite\.Web\.Html\.SyntaxHighlighter\x22)(.|\W|\s)+?(<\/f:function>)");
-
-                    if (allResults.Count != 0)
+                    foreach (var singleParam in paramNodes)
                     {
-                        var code = "";
+                        var valueNodes = Regex.Matches(singleParam.ToString(), @"(value=\W?).+?(\x22)");
 
-                        foreach (var item in allResults)
+                        foreach (var singleValue in valueNodes)
                         {
-                            var help = item.ToString();
+                            code = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)")[0].Value;
 
-                            var paramNodes = Regex.Matches(help, @"(<f:param\s{1}name=\x22SourceCode\x22).+?(\/>)");
-
-                            if (paramNodes.Count != 0)
+                            if (code.StartsWith("\x22") && code.EndsWith("\x22"))
                             {
-                                foreach (var singleParam in paramNodes)
-                                {
-                                    var valueNodes = Regex.Matches(singleParam.ToString(), @"(value=\W?).+?(\x22)");
-
-                                    foreach (var singleValue in valueNodes)
-                                    {
-                                        code = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)")[0].Value;
-
-                                        var test = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)");
-
-                                        if (code.StartsWith("\x22") && code.EndsWith("\x22"))
-                                        {
-                                            code = code.Substring(1, code.Length - 1);
-                                            code = code.Remove(code.Length - 1);
-                                        }
-
-                                        var highlight = "{% highlight javascript %}";
-
-                                        var highlightEnd = "{% endhighlight %}";
-
-                                        var newCode = $"{highlight}{code}{highlightEnd}";
-
-                                        xeString = fullCode.Replace(help, newCode);
-                                    }
-                                }
+                                code = code.Substring(1, code.Length - 1);
+                                code = code.Remove(code.Length - 1);
                             }
+
+                            code = code.Replace("&#xA;", "\r\n");
+                            code = code.Replace("&#x9;", "    ");
+
+                            var highlight = "{% highlight javascript %}";
+
+                            var highlightEnd = "{% endhighlight %}";
+
+                            var newCode = $"{highlight}{code}{highlightEnd}";
+
+                            xeString = fullCode.Replace(help, newCode);
                         }
                     }
                 }
-                sw.Write(xeString);
             }
+            return xeString;
         }
 
         private static string MakeHyperLink(string content,string pattern, Dictionary<string,string> ids)
