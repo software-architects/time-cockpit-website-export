@@ -97,7 +97,7 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void MakeBlog(DataTable dt, string blogUrl)
         {
-            for (int i = 17; i < dt.Rows.Count; i++)
+            for (int i = 0; i < dt.Rows.Count; i++)
             {
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
@@ -301,7 +301,7 @@ namespace GetDataFromServerAndSaveInFile
                 if (blog)
                 {
                     var fullCode = xeString;
-                    var allResults = Regex.Matches(fullCode, @"(<f:function\s{1}name=\x22Composite\.Web\.Html\.SyntaxHighlighter\x22)(.|\W|\s)+(<\/f:function>)");
+                    var allResults = Regex.Matches(fullCode, @"(<f:function\s{1}name=\x22Composite\.Web\.Html\.SyntaxHighlighter\x22)(.|\W|\s)+?(<\/f:function>)");
 
                     if (allResults.Count != 0)
                     {
