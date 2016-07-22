@@ -101,7 +101,7 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void AddFilesToIgnore()
         {
-			filesToIgnore = new string[] { "/de/blog/", "/blog/" };
+			filesToIgnore = new string[] { "", "" };
 		}
 
         private static int CheckToIgnore(string path)
@@ -327,10 +327,10 @@ namespace GetDataFromServerAndSaveInFile
             {
                 sw.WriteLine("layout: page");
                 sw.WriteLine($"title: {titleConvert}");
-            }
 
-			if (fullPath == "/home/")
-				fullPath = "/";
+			    if (fullPath == "/home/")
+				    fullPath = "/";
+            }
 
             if (german)
                 sw.WriteLine($"permalink: /de{fullPath}");
@@ -392,7 +392,8 @@ namespace GetDataFromServerAndSaveInFile
                                 code = code.Remove(code.Length - 1);
                             }
 
-                            code = code.Replace("&#xA;", "\r\n");
+                            code = code.Replace("&#xA;", "\n");
+                            code = code.Replace("&#xD;", "\r");
                             code = code.Replace("&#x9;", "    ");
 
                             var highlight = "{% highlight javascript %}";
