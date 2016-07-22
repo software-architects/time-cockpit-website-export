@@ -100,9 +100,23 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void AddFilesToIgnore()
         {
-            //filesToIgnore = {"home.md","sdfa"};
+            filesToIgnore = new string[] { "/de/"};
         }
 
+        private static int CheckToIgnore(string path)
+        {
+            int check;
+
+            if (path == "/home/")
+                path = "/";
+
+            if (german)
+                check = Array.IndexOf(filesToIgnore, $"/de{path}");
+            else
+                check = Array.IndexOf(filesToIgnore, path);
+
+            return check;
+        } 
 
         private static void MakeBlog(DataTable dt, string rootUrl)
         {
@@ -128,11 +142,14 @@ namespace GetDataFromServerAndSaveInFile
                 CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{path}");
 
                 var fullpath = $"{path}/{dt.Rows[i]["titleUrl"]}";
-                
-                using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{fullpath}.md"))
+
+                if (CheckToIgnore(fullpath) <= -1)
                 {
-                    SetHeader(sw, dt, i, fullpath);
-                    ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
+                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{fullpath}.md"))
+                    {
+                        SetHeader(sw, dt, i, fullpath);
+                        ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
+                    }
                 }
             }
         }
@@ -227,21 +244,24 @@ namespace GetDataFromServerAndSaveInFile
                     fileName = splitUrl[splitUrl.Length - 1];
                 }
                 helpPath = $"{folderPath}{fileName}/";
-                
-                if (dt.Rows[i]["placeholderid"].ToString() == "content")
-                {
-                    CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}");
 
-                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}{fileName}.md"))
-                    {
-                        SetHeader(sw, dt, i, helpPath);
-                        ContentSeperatorAndSetter(sw,dt.Rows[i]["content"].ToString());
-                    }
-                }
-                else
+                if (CheckToIgnore(helpPath) <= -1)
                 {
-                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}{fileName}.md", true))
-                        ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
+                    if (dt.Rows[i]["placeholderid"].ToString() == "content")
+                    {
+                        CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}");
+
+                        using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}{fileName}.md"))
+                        {
+                            SetHeader(sw, dt, i, helpPath);
+                            ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
+                        }
+                    }
+                    else
+                    {
+                        using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}{fileName}.md", true))
+                            ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
+                    }
                 }
             }
         }
