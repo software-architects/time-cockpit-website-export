@@ -21,6 +21,7 @@ namespace GetDataFromServerAndSaveInFile
         private static bool blog = true;
         private static Dictionary<string, string> idWithPathsPages = new Dictionary<string, string>();
         private static Dictionary<string, string> idWithPathsData = new Dictionary<string, string>();
+        private static Dictionary<string, string[]> idWithPathsBlogs = new Dictionary<string, string[]>();
         private static string[] filesToIgnore;
 
         public static void Main(string[] args)
@@ -38,8 +39,8 @@ namespace GetDataFromServerAndSaveInFile
 
                 var mediaFile = @"select id, folderPath, fileName from Composite_Data_Types_IMediaFileData_Published;";
 
-                var blogEntriesGerman = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.date,p.Author,p.Content ,pp.name FROM Composite_Community_Blog_Entries_de_AT p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
-                var blogEntriesEnglish = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.date,p.Author,p.Content ,pp.name FROM Composite_Community_Blog_Entries_en_US p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id; ";
+                var blogEntriesGerman = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_de_AT p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
+                var blogEntriesEnglish = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_en_US p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id; ";
 
                 using (var dataEnglish = new SqlDataAdapter(pageEnglish, conn))
                 using (var urlDataEnglish = new SqlDataAdapter(urlEnglish, conn))
@@ -125,23 +126,28 @@ namespace GetDataFromServerAndSaveInFile
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
                 var path = "/blog/";
+                var month = date.Month.ToString();
+                var day = date.Day.ToString();
 
                 if (date.Month.ToString().Length == 1)
-                {
-                    var month = $"0{date.Month}";
-                    path += $"{date.Year}/{month}/{date.Day}";
-                }
-                else if(date.Day.ToString().Length == 1)
-                {
-                    var day = $"0{date.Day}";
-                    path += $"{date.Year}/{date.Month}/{day}";
-                }
-                else
-                    path += $"{date.Year}/{date.Month}/{date.Day}";
+                    month = $"0{date.Month}";
+                if(date.Day.ToString().Length == 1)
+                    day = $"0{date.Day}";
+
+                path += $"{date.Year}/{month}/{day}";
 
                 CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{path}");
 
                 var fullpath = $"{path}/{dt.Rows[i]["titleUrl"]}";
+
+                var id = dt.Rows[i]["id"].ToString();
+
+                if (idWithPathsBlogs.ContainsKey(id))
+                    idWithPathsBlogs[id][1] = fullpath;
+                else if (german)
+                    idWithPathsBlogs.Add(id, new string[] { $"/de{fullpath}", "" });
+                else
+                    idWithPathsBlogs.Add(id, new string[] { "", fullpath });
 
                 if (CheckToIgnore(fullpath) <= -1)
                 {
@@ -268,17 +274,21 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void SetHeader(StreamWriter sw, DataTable dt,int index, string fullPath)
         {
-            var titleConvert = dt.Rows[index]["title"].ToString().Replace(':', ',');
+            var titleConvert = dt.Rows[index]["title"].ToString().Replace(":", " - ");
 
             sw.WriteLine("---");
 
             if (blog)
             {
-                var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-mm-dd");
+                var teaser = dt.Rows[index]["teaser"].ToString().Replace(":", " - ");
+                var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-MM-dd");
+                var language = dt.Rows[index]["SourceCultureName"].ToString().Substring(0, 2);
+                var reference = "";
+                var isEmptyReference = true;
 
                 sw.WriteLine("layout: blog");
                 sw.WriteLine($"title: {titleConvert}");
-                sw.WriteLine($"teaser: {dt.Rows[index]["teaser"]}");
+                sw.WriteLine($"teaser: {teaser}");
                 sw.WriteLine($"author: {dt.Rows[index]["name"]}");
                 sw.WriteLine($"date: {date}");
 
@@ -293,6 +303,25 @@ namespace GetDataFromServerAndSaveInFile
                 }
 
                 sw.WriteLine($"bannerimage: {imageUrl}");
+                sw.WriteLine($"lang: {language}");
+
+                if (german)
+                {
+                    if ((reference = idWithPathsBlogs[dt.Rows[index]["id"].ToString()][1]) == string.Empty)
+                        isEmptyReference = true;
+                    else
+                        isEmptyReference = false;
+                }
+                else
+                {
+                    if ((reference = idWithPathsBlogs[dt.Rows[index]["id"].ToString()][0]) == string.Empty)
+                        isEmptyReference = true;
+                    else
+                        isEmptyReference = false;
+                }
+
+                if(!isEmptyReference)
+                    sw.WriteLine($"ref: {reference}");
             }
             else
             {
