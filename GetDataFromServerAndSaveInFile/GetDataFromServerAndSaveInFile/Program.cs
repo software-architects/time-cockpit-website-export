@@ -121,7 +121,7 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void MakeBlog(DataTable dt, string rootUrl)
         {
-            for (int i = 166; i < dt.Rows.Count-132; i++)
+            for (int i = 0; i < dt.Rows.Count; i++)
             {
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
@@ -281,6 +281,7 @@ namespace GetDataFromServerAndSaveInFile
             if (blog)
             {
                 var teaser = dt.Rows[index]["teaser"].ToString().Replace(":", " - ");
+                teaser = teaser.Replace("\r\n", " ");
                 var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-MM-dd");
                 var language = dt.Rows[index]["SourceCultureName"].ToString().Substring(0, 2);
                 var reference = "";
