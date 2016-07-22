@@ -21,6 +21,7 @@ namespace GetDataFromServerAndSaveInFile
         private static bool blog = true;
         private static Dictionary<string, string> idWithPathsPages = new Dictionary<string, string>();
         private static Dictionary<string, string> idWithPathsData = new Dictionary<string, string>();
+        private static string[] filesToIgnore;
 
         public static void Main(string[] args)
         {
@@ -73,6 +74,8 @@ namespace GetDataFromServerAndSaveInFile
                         CheckDirectory(ConfigurationManager.AppSettings["DeRootUrl"]);
                         CheckDirectory(ConfigurationManager.AppSettings["EnRootUrl"]);
 
+                        AddFilesToIgnore();
+
                         DownloadData(urlDataTableMediaFile);
 
                         MakeBlog(dataTableBlogEntriesGerman, "DeRootUrl");
@@ -94,6 +97,12 @@ namespace GetDataFromServerAndSaveInFile
             }
             //Console.ReadKey();
         }
+
+        private static void AddFilesToIgnore()
+        {
+            //filesToIgnore = {"home.md","sdfa"};
+        }
+
 
         private static void MakeBlog(DataTable dt, string rootUrl)
         {
@@ -332,7 +341,7 @@ namespace GetDataFromServerAndSaveInFile
                                             code = code.Remove(code.Length - 1);
                                         }
 
-                                        var highlight = "{% highlight javascript}";
+                                        var highlight = "{% highlight javascript %}";
 
                                         var highlightEnd = "{% endhighlight %}";
 
