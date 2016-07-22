@@ -394,6 +394,7 @@ namespace GetDataFromServerAndSaveInFile
 
                             code = code.Replace("&#xA;", "\n");
                             code = code.Replace("&#xD;", "\r");
+                            code = code.Replace("&quot;", "\x22");
                             code = code.Replace("&#x9;", "    ");
 
                             var highlight = "{% highlight javascript %}";
