@@ -101,8 +101,8 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void AddFilesToIgnore()
         {
-            filesToIgnore = new string[] { "/de/"};
-        }
+			filesToIgnore = new string[] { "/de/blog/", "/blog/" };
+		}
 
         private static int CheckToIgnore(string path)
         {
