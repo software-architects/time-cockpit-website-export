@@ -25,6 +25,7 @@ namespace GetDataFromServerAndSaveInFile
         private static Dictionary<string, string> idWithPathsData = new Dictionary<string, string>();
         private static Dictionary<string, string[]> idWithPathsBlogs = new Dictionary<string, string[]>();
         private static string[] filesToIgnore;
+        private static string current;
 
         public static void Main(string[] args)
         {
@@ -147,6 +148,8 @@ namespace GetDataFromServerAndSaveInFile
 
                 var fullpath = $"{path}/{dt.Rows[i]["titleUrl"]}";
 
+                current = fullpath;
+
                 var id = dt.Rows[i]["id"].ToString();
 
                 if (idWithPathsBlogs.ContainsKey(id))
@@ -262,6 +265,8 @@ namespace GetDataFromServerAndSaveInFile
                 }
                 helpPath = $"{folderPath}{fileName}/";
 
+                current = helpPath;
+
                 if (CheckToIgnore(helpPath) <= -1)
                 {
                     if (dt.Rows[i]["placeholderid"].ToString() == "content")
@@ -371,6 +376,9 @@ namespace GetDataFromServerAndSaveInFile
         private static void ContentSeperatorAndSetter(StreamWriter sw, string content)
         {
             var document = XDocument.Parse(content);
+            var hasFunction = false;
+            var finalCheck = false;
+            int count = 0;
             //var xnm = new XmlNamespaceManager(new NameTable());
             //xnm.AddNamespace("x", "http://www.w3.org/1999/xhtml");
 
@@ -381,7 +389,7 @@ namespace GetDataFromServerAndSaveInFile
             var nodes = withoutNamespace.XPathSelectElement("/html/body").Elements();
 
             foreach (var xe in nodes)
-            { 
+            {
                 var xeString = xe.ToString();
 
                 xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
@@ -394,21 +402,44 @@ namespace GetDataFromServerAndSaveInFile
                 if (blog)
                     xeString = MakeHighLight(xeString);
 
+                hasFunction = PrintAllFunction(xeString);
+
+                if (hasFunction)
+                {
+                    count++;
+                    if(count == 1)
+                        finalCheck = true;
+                }
+
                 sw.Write(xeString);
             }
+
+            if(hasFunction)
+                Console.WriteLine($"{current} beinhaltet funktion");
+        }
+
+        private static bool PrintAllFunction(string content)
+        {
+            var result1 = Regex.IsMatch(content, @"(<function\s{1}name=\x22)(.|\W|\s|\x22)+?(<\/function>)");
+
+            if (result1)
+                return true;
+            else
+                return false;
         }
 
         private static string MakeHighLight(string xeString)
         {
             var fullCode = xeString;
-            var allResults = Regex.Matches(fullCode, @"(<f:function\s{1}name=\x22Composite\.Web\.Html\.SyntaxHighlighter\x22)(.|\W|\s)+?(<\/f:function>)");
+
+            var allResults = Regex.Matches(fullCode, @"(<function\s{1}name=\x22Composite\.Web\.Html\.SyntaxHighlighter\x22)(.|\W|\s)+?(<\/function>)");
             var code = "";
 
             foreach (var item in allResults)
             {
                 var help = item.ToString();
 
-                var paramNodes = Regex.Matches(help, @"(<f:param\s{1}name=\x22SourceCode\x22).+?(\/>)");
+                var paramNodes = Regex.Matches(help, @"(<param\s{1}name=\x22SourceCode\x22).+?(\/>)");
 
                 if (paramNodes.Count != 0)
                 {
@@ -426,7 +457,7 @@ namespace GetDataFromServerAndSaveInFile
                                 code = code.Remove(code.Length - 1);
                             }
 
-                            code = code.Replace("&#xA;", "\n").Replace("&#xD;", "\r").Replace("&quot;", "\x22").Replace("&#x9;", "    ");
+                            code = code.Replace("&#xA;", "\n").Replace("&#xD;", "\r").Replace("&quot;", "\x22").Replace("&#x9;", "    ").Replace("&lt;", "<").Replace("&gt;", ">").Replace("&amp;", "&");
 
                             var highlight = "{% highlight javascript %}";
 
