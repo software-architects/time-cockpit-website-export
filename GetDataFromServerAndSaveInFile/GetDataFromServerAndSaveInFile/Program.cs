@@ -229,7 +229,7 @@ namespace GetDataFromServerAndSaveInFile
                 }
 
                 if (german)
-                    helpPath = $"de{folderPath}{fileName}/";
+                    helpPath = $"/de{folderPath}{fileName}/";
                 else
                     helpPath = $"{folderPath}{fileName}/";
 
@@ -367,7 +367,6 @@ namespace GetDataFromServerAndSaveInFile
             }
             return document;
         }
-
 
         private static void ContentSeperatorAndSetter(StreamWriter sw, string content)
         {
