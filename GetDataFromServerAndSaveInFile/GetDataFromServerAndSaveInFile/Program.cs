@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net;
+using System.Linq;
 
 namespace GetDataFromServerAndSaveInFile
 {
@@ -96,7 +97,7 @@ namespace GetDataFromServerAndSaveInFile
                     }
                 }
             }
-            //Console.ReadKey();
+            Console.ReadKey();
         }
 
         private static void AddFilesToIgnore()
@@ -121,7 +122,7 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void MakeBlog(DataTable dt, string rootUrl)
         {
-            for (int i = 0; i < dt.Rows.Count; i++)
+            for (int i = 169; i < dt.Rows.Count-129; i++)
             {
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
@@ -148,6 +149,12 @@ namespace GetDataFromServerAndSaveInFile
                     idWithPathsBlogs.Add(id, new string[] { $"/de{fullpath}", "" });
                 else
                     idWithPathsBlogs.Add(id, new string[] { "", fullpath });
+
+                if (date.Year == 2015 && month == "03")
+                {
+                    Console.WriteLine(i);
+                    Console.WriteLine(fullpath);
+                }
 
                 if (CheckToIgnore(fullpath) <= -1)
                 {
@@ -341,6 +348,29 @@ namespace GetDataFromServerAndSaveInFile
             sw.WriteLine();
         }
 
+        //public static string RemoveAllNamespaces(string xmlDocument)
+        //{
+        //    XElement xmlDocumentWithoutNs = RemoveAllNamespaces(XElement.Parse(xmlDocument));
+
+        //    return xmlDocumentWithoutNs.ToString();
+        //}
+
+        //private static XElement RemoveAllNamespaces(XElement xmlDocument)
+        //{
+        //    if (!xmlDocument.HasElements)
+        //    {
+        //        XElement xElement = new XElement(xmlDocument.Name.LocalName);
+        //        xElement.Value = xmlDocument.Value;
+
+        //        foreach (XAttribute attribute in xmlDocument.Attributes())
+        //            xElement.Add(attribute);
+
+        //        return xElement;
+        //    }
+        //    return new XElement(xmlDocument.Name.LocalName, xmlDocument.Elements().Select(el => RemoveAllNamespaces(el)));
+        //}
+
+
         private static void ContentSeperatorAndSetter(StreamWriter sw, string content)
         {
             var document = XDocument.Parse(content);
@@ -351,6 +381,8 @@ namespace GetDataFromServerAndSaveInFile
 
             foreach (var xe in nodes)
             {
+                //var xeString = RemoveAllNamespaces(xe.ToString());
+
                 var xeString = xe.ToString();
 
                 xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
@@ -392,10 +424,7 @@ namespace GetDataFromServerAndSaveInFile
                                 code = code.Remove(code.Length - 1);
                             }
 
-                            code = code.Replace("&#xA;", "\n");
-                            code = code.Replace("&#xD;", "\r");
-                            code = code.Replace("&quot;", "\x22");
-                            code = code.Replace("&#x9;", "    ");
+                            code = code.Replace("&#xA;", "\n").Replace("&#xD;", "\r").Replace("&quot;", "\x22").Replace("&#x9;", "    ");
 
                             var highlight = "{% highlight javascript %}";
 
