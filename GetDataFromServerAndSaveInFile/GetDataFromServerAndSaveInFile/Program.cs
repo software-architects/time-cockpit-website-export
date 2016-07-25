@@ -20,7 +20,8 @@ namespace GetDataFromServerAndSaveInFile
     {
         private static bool german = true;
         private static bool blog = true;
-        private static Dictionary<string, string> idWithPathsPages = new Dictionary<string, string>();
+        private static Dictionary<string, string> idWithPathsPagesGerman = new Dictionary<string, string>();
+        private static Dictionary<string, string> idWithPathsPagesEnglish = new Dictionary<string, string>();
         private static Dictionary<string, string> idWithPathsData = new Dictionary<string, string>();
         private static Dictionary<string, string[]> idWithPathsBlogs = new Dictionary<string, string[]>();
         private static string[] filesToIgnore;
@@ -70,8 +71,13 @@ namespace GetDataFromServerAndSaveInFile
                         dataBlogEntriesGerman.Fill(dataTableBlogEntriesGerman);
                         dataBlogEntriesEnglish.Fill(dataTableBlogEntriesEnglish);
 
-                        FillDictionary(dataTableGerman, urlDataTableGerman);
-                        FillDictionary(dataTableEnglish, urlDataTableEnglish);
+                        FillDictionary(dataTableGerman, urlDataTableGerman, idWithPathsPagesGerman);
+
+                        german = false;
+
+                        FillDictionary(dataTableEnglish, urlDataTableEnglish, idWithPathsPagesEnglish);
+
+                        german = true;
 
                         CheckDirectory(ConfigurationManager.AppSettings["DeRootUrl"]);
                         CheckDirectory(ConfigurationManager.AppSettings["EnRootUrl"]);
@@ -97,7 +103,7 @@ namespace GetDataFromServerAndSaveInFile
                     }
                 }
             }
-            Console.ReadKey();
+            //Console.ReadKey();
         }
 
         private static void AddFilesToIgnore()
@@ -122,7 +128,7 @@ namespace GetDataFromServerAndSaveInFile
 
         private static void MakeBlog(DataTable dt, string rootUrl)
         {
-            for (int i = 169; i < dt.Rows.Count-129; i++)
+            for (int i = 0; i < dt.Rows.Count; i++)
             {
                 DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
 
@@ -149,12 +155,6 @@ namespace GetDataFromServerAndSaveInFile
                     idWithPathsBlogs.Add(id, new string[] { $"/de{fullpath}", "" });
                 else
                     idWithPathsBlogs.Add(id, new string[] { "", fullpath });
-
-                if (date.Year == 2015 && month == "03")
-                {
-                    Console.WriteLine(i);
-                    Console.WriteLine(fullpath);
-                }
 
                 if (CheckToIgnore(fullpath) <= -1)
                 {
@@ -204,7 +204,7 @@ namespace GetDataFromServerAndSaveInFile
             }
         }   
 
-        private static void FillDictionary(DataTable dt, DataTable urlDt)
+        private static void FillDictionary(DataTable dt, DataTable urlDt, Dictionary<string,string> pages)
         {
             for (int i = 0; i < dt.Rows.Count; i++)
             {
@@ -227,10 +227,14 @@ namespace GetDataFromServerAndSaveInFile
                     }
                     fileName = splitUrl[splitUrl.Length - 1];
                 }
-                helpPath = $"{folderPath}{fileName}/";
 
-                if (!idWithPathsPages.ContainsKey(foundrow[0]["id"].ToString()))
-                    idWithPathsPages.Add(foundrow[0]["id"].ToString(), helpPath);
+                if (german)
+                    helpPath = $"de{folderPath}{fileName}/";
+                else
+                    helpPath = $"{folderPath}{fileName}/";
+
+                if (!pages.ContainsKey(foundrow[0]["id"].ToString()))
+                    pages.Add(foundrow[0]["id"].ToString(), helpPath);
             }
         }
 
@@ -348,46 +352,45 @@ namespace GetDataFromServerAndSaveInFile
             sw.WriteLine();
         }
 
-        //public static string RemoveAllNamespaces(string xmlDocument)
-        //{
-        //    XElement xmlDocumentWithoutNs = RemoveAllNamespaces(XElement.Parse(xmlDocument));
-
-        //    return xmlDocumentWithoutNs.ToString();
-        //}
-
-        //private static XElement RemoveAllNamespaces(XElement xmlDocument)
-        //{
-        //    if (!xmlDocument.HasElements)
-        //    {
-        //        XElement xElement = new XElement(xmlDocument.Name.LocalName);
-        //        xElement.Value = xmlDocument.Value;
-
-        //        foreach (XAttribute attribute in xmlDocument.Attributes())
-        //            xElement.Add(attribute);
-
-        //        return xElement;
-        //    }
-        //    return new XElement(xmlDocument.Name.LocalName, xmlDocument.Elements().Select(el => RemoveAllNamespaces(el)));
-        //}
+        private static XDocument RemoveNameSpace(XDocument document)
+        {
+            foreach (XElement e in document.Root.DescendantsAndSelf())
+            {
+                if(e.Name.Namespace != XNamespace.None)
+                {
+                    e.Name = XNamespace.None.GetName(e.Name.LocalName);
+                }
+                if (e.Attributes().Where(a => a.IsNamespaceDeclaration || a.Name.Namespace != XNamespace.None).Any())
+                {
+                    e.ReplaceAttributes(e.Attributes().Select(a => a.IsNamespaceDeclaration ? null : a.Name.Namespace != XNamespace.None ? new XAttribute(XNamespace.None.GetName(a.Name.LocalName), a.Value) : a));
+                }
+            }
+            return document;
+        }
 
 
         private static void ContentSeperatorAndSetter(StreamWriter sw, string content)
         {
             var document = XDocument.Parse(content);
-            var xnm = new XmlNamespaceManager(new NameTable());
-            xnm.AddNamespace("x", "http://www.w3.org/1999/xhtml");
+            //var xnm = new XmlNamespaceManager(new NameTable());
+            //xnm.AddNamespace("x", "http://www.w3.org/1999/xhtml");
 
-            var nodes = document.XPathSelectElement("/x:html/x:body", xnm).Elements();
+            var withoutNamespace = RemoveNameSpace(document);
+
+            //var nodes = document.XPathSelectElement("/x:html/x:body",xnm).Elements();
+
+            var nodes = withoutNamespace.XPathSelectElement("/html/body").Elements();
 
             foreach (var xe in nodes)
-            {
-                //var xeString = RemoveAllNamespaces(xe.ToString());
-
+            { 
                 var xeString = xe.ToString();
 
                 xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
 
-                xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPages);
+                if (german)
+                    xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPagesGerman);
+                else
+                    xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPagesEnglish);
 
                 if (blog)
                     xeString = MakeHighLight(xeString);
