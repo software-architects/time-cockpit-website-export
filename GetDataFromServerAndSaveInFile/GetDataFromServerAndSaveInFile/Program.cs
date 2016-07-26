@@ -8,9 +8,6 @@ using System.Xml.XPath;
 using System.Configuration;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Net;
 using System.Linq;
 
@@ -24,8 +21,9 @@ namespace GetDataFromServerAndSaveInFile
         private static Dictionary<string, string> idWithPathsPagesEnglish = new Dictionary<string, string>();
         private static Dictionary<string, string> idWithPathsData = new Dictionary<string, string>();
         private static Dictionary<string, string[]> idWithPathsBlogs = new Dictionary<string, string[]>();
+        private static Dictionary<string, string> idWithPathsDevBlogs = new Dictionary<string, string>();
         private static string[] filesToIgnore;
-        private static string current;
+        private static string currentPath;
 
         public static void Main(string[] args)
         {
@@ -42,8 +40,8 @@ namespace GetDataFromServerAndSaveInFile
 
                 var mediaFile = @"select id, folderPath, fileName from Composite_Data_Types_IMediaFileData_Published;";
 
-                var blogEntriesGerman = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_de_AT p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
-                var blogEntriesEnglish = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_en_US p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id; ";
+                var blogEntriesGerman = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.tags,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_de_AT p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
+                var blogEntriesEnglish = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.tags,p.devblog,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_en_US p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
 
                 using (var dataEnglish = new SqlDataAdapter(pageEnglish, conn))
                 using (var urlDataEnglish = new SqlDataAdapter(urlEnglish, conn))
@@ -127,43 +125,70 @@ namespace GetDataFromServerAndSaveInFile
             return check;
         } 
 
+        private static void MakePath(DataTable dt, int index, string rootUrl)
+        {
+            DateTime date = Convert.ToDateTime(dt.Rows[index]["date"]);
+
+            var path = "/blog/";
+            var month = date.Month.ToString();
+            var day = date.Day.ToString();
+
+            if (date.Month.ToString().Length == 1)
+                month = $"0{date.Month}";
+            if (date.Day.ToString().Length == 1)
+                day = $"0{date.Day}";
+
+            path += $"{date.Year}/{month}/{day}";
+
+            CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{path}");
+
+            var fullpath = $"{path}/{dt.Rows[index]["titleUrl"]}";
+            
+            currentPath = fullpath;
+        }
+
         private static void MakeBlog(DataTable dt, string rootUrl)
         {
+            var url = rootUrl;
+
             for (int i = 0; i < dt.Rows.Count; i++)
             {
-                DateTime date = Convert.ToDateTime(dt.Rows[i]["date"]);
-
-                var path = "/blog/";
-                var month = date.Month.ToString();
-                var day = date.Day.ToString();
-
-                if (date.Month.ToString().Length == 1)
-                    month = $"0{date.Month}";
-                if(date.Day.ToString().Length == 1)
-                    day = $"0{date.Day}";
-
-                path += $"{date.Year}/{month}/{day}";
-
-                CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{path}");
-
-                var fullpath = $"{path}/{dt.Rows[i]["titleUrl"]}";
-
-                current = fullpath;
+                rootUrl = url;
 
                 var id = dt.Rows[i]["id"].ToString();
 
-                if (idWithPathsBlogs.ContainsKey(id))
-                    idWithPathsBlogs[id][1] = fullpath;
-                else if (german)
-                    idWithPathsBlogs.Add(id, new string[] { $"/de{fullpath}", "" });
-                else
-                    idWithPathsBlogs.Add(id, new string[] { "", fullpath });
-
-                if (CheckToIgnore(fullpath) <= -1)
+                if (!german)
                 {
-                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{fullpath}.md"))
+                    if (dt.Rows[i]["devblog"].ToString() == "True")
                     {
-                        SetHeader(sw, dt, i, fullpath);
+                        MakePath(dt, i, "DevRootUrl");
+
+                        idWithPathsDevBlogs.Add(id, currentPath);
+
+                        rootUrl = "DevRootUrl";
+                    }
+                    else
+                    {
+                        MakePath(dt, i, rootUrl);
+
+                        if (idWithPathsBlogs.ContainsKey(id))
+                            idWithPathsBlogs[id][1] = currentPath;
+                        else
+                            idWithPathsBlogs.Add(id, new string[] { "", currentPath });
+                    }
+                }
+                else
+                {
+                    MakePath(dt, i, rootUrl);
+
+                    idWithPathsBlogs.Add(id, new string[] { $"/de{currentPath}", "" });
+                }
+
+                if (CheckToIgnore(currentPath) <= -1)
+                {
+                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{currentPath}.md"))
+                    {
+                        SetHeader(sw, dt, i, currentPath);
                         ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
                     }
                 }
@@ -265,7 +290,7 @@ namespace GetDataFromServerAndSaveInFile
                 }
                 helpPath = $"{folderPath}{fileName}/";
 
-                current = helpPath;
+                currentPath = helpPath;
 
                 if (CheckToIgnore(helpPath) <= -1)
                 {
@@ -330,10 +355,31 @@ namespace GetDataFromServerAndSaveInFile
                 }
                 else
                 {
-                    if ((reference = idWithPathsBlogs[dt.Rows[index]["id"].ToString()][0]) == string.Empty)
-                        isEmptyReference = true;
+                    if (dt.Rows[index]["devblog"].ToString() == "True")
+                    {
+                        var tags = dt.Rows[index]["tags"].ToString().Split(',');
+
+                        var tagString = "[";
+
+                        for (int i = 0; i < tags.Length; i++)
+                        {
+                            if (tags.Length-1 != i)
+                                tagString += $"{tags[i]},";
+                            else
+                                tagString += tags[i];
+                        }
+
+                        tagString += "]";
+
+                        sw.WriteLine($"tags: {tagString}");
+                    }
                     else
-                        isEmptyReference = false;
+                    {
+                        if ((reference = idWithPathsBlogs[dt.Rows[index]["id"].ToString()][0]) == string.Empty)
+                            isEmptyReference = true;
+                        else
+                            isEmptyReference = false;
+                    }
                 }
 
                 if(!isEmptyReference)
@@ -415,7 +461,7 @@ namespace GetDataFromServerAndSaveInFile
             }
 
             if(hasFunction)
-                Console.WriteLine($"{current} beinhaltet funktion");
+                Console.WriteLine($"{currentPath} beinhaltet funktion");
         }
 
         private static bool PrintAllFunction(string content)
@@ -440,16 +486,19 @@ namespace GetDataFromServerAndSaveInFile
                 var help = item.ToString();
 
                 var paramNodes = Regex.Matches(help, @"(<param\s{1}name=\x22SourceCode\x22).+?(\/>)");
+                var paramCodeType = Regex.Matches(help, @"(<param\s{1}name=\x22CodeType\x22).+?(\/>)");
 
                 if (paramNodes.Count != 0)
                 {
                     foreach (var singleParam in paramNodes)
                     {
                         var valueNodes = Regex.Matches(singleParam.ToString(), @"(value=\W?).+?(\x22)");
+                        var valueCodeType = Regex.Matches(paramCodeType[0].ToString(), @"(value=\W?).+?(\x22)");
 
                         foreach (var singleValue in valueNodes)
                         {
                             code = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)")[0].Value;
+                            var codeType = Regex.Matches(valueCodeType[0].ToString(), @"(\x22).+?(\x22)")[0].Value;
 
                             if (code.StartsWith("\x22") && code.EndsWith("\x22"))
                             {
@@ -457,9 +506,12 @@ namespace GetDataFromServerAndSaveInFile
                                 code = code.Remove(code.Length - 1);
                             }
 
+                            codeType = codeType.Substring(1, codeType.Length - 1);
+                            codeType = codeType.Remove(codeType.Length - 1);
+
                             code = code.Replace("&#xA;", "\n").Replace("&#xD;", "\r").Replace("&quot;", "\x22").Replace("&#x9;", "    ").Replace("&lt;", "<").Replace("&gt;", ">").Replace("&amp;", "&");
 
-                            var highlight = "{% highlight javascript %}";
+                            var highlight = "{% highlight "+codeType+" %}";
 
                             var highlightEnd = "{% endhighlight %}";
 
