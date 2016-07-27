@@ -161,6 +161,7 @@ namespace GetDataFromServerAndSaveInFile
             for (int i = 0; i < dt.Rows.Count; i++)
             {
                 url = "RootUrl";
+                fileName = "";
 
                 var id = dt.Rows[i]["id"].ToString();
 
@@ -362,25 +363,23 @@ namespace GetDataFromServerAndSaveInFile
                 }
                 else
                 {
-                    if (dt.Rows[index]["devblog"].ToString() == "True")
+                    var tags = dt.Rows[index]["tags"].ToString().Split(',');
+
+                    var tagString = "[";
+
+                    for (int i = 0; i < tags.Length; i++)
                     {
-                        var tags = dt.Rows[index]["tags"].ToString().Split(',');
-
-                        var tagString = "[";
-
-                        for (int i = 0; i < tags.Length; i++)
-                        {
-                            if (tags.Length-1 != i)
-                                tagString += $"{tags[i]},";
-                            else
-                                tagString += tags[i];
-                        }
-
-                        tagString += "]";
-
-                        sw.WriteLine($"tags: {tagString}");
+                        if (tags.Length-1 != i)
+                            tagString += $"{tags[i]},";
+                        else
+                            tagString += tags[i];
                     }
-                    else
+
+                    tagString += "]";
+
+                    sw.WriteLine($"tags: {tagString}");
+
+                    if (dt.Rows[index]["devblog"].ToString() == "False")
                     {
                         if ((reference = idWithPathsBlogs[dt.Rows[index]["id"].ToString()][0]) == string.Empty)
                             isEmptyReference = true;
