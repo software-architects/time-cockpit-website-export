@@ -78,27 +78,26 @@ namespace GetDataFromServerAndSaveInFile
 
                         german = true;
 
-                        CheckDirectory(ConfigurationManager.AppSettings["DeRootUrl"]);
-                        CheckDirectory(ConfigurationManager.AppSettings["EnRootUrl"]);
+                        CheckDirectory(ConfigurationManager.AppSettings["RootUrl"]);
 
                         AddFilesToIgnore();
 
                         DownloadData(urlDataTableMediaFile);
 
-                        MakeBlog(dataTableBlogEntriesGerman, "DeRootUrl");
+                        MakeBlog(dataTableBlogEntriesGerman);
 
                         german = false;
 
-                        MakeBlog(dataTableBlogEntriesEnglish, "EnRootUrl");
+                        MakeBlog(dataTableBlogEntriesEnglish);
 
-                        german = true;
-                        blog = false;
+                        //german = true;
+                        //blog = false;
 
-                        MakeHtml(dataTableGerman, urlDataTableGerman, "DeRootUrl");
+                        //MakeHtml(dataTableGerman, urlDataTableGerman, "DeRootUrl");
 
-                        german = false;
+                        //german = false;
 
-                        MakeHtml(dataTableEnglish, urlDataTableEnglish, "EnRootUrl");
+                        //MakeHtml(dataTableEnglish, urlDataTableEnglish, "EnRootUrl");
                     }
                 }
             }
@@ -125,11 +124,16 @@ namespace GetDataFromServerAndSaveInFile
             return check;
         } 
 
-        private static void MakePath(DataTable dt, int index, string rootUrl)
+        private static string MakePath(DataTable dt, int index, string rootUrl)
         {
             DateTime date = Convert.ToDateTime(dt.Rows[index]["date"]);
+            var path = "";
 
-            var path = "/blog/";
+            if (rootUrl == "DevRootUrl")
+                path = "/devblog/";
+            else
+                path = "/blog/";
+
             var month = date.Month.ToString();
             var day = date.Day.ToString();
 
@@ -140,20 +144,23 @@ namespace GetDataFromServerAndSaveInFile
 
             path += $"{date.Year}/{month}/{day}";
 
-            CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}{path}");
+            CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}"); //{path}
 
             var fullpath = $"{path}/{dt.Rows[index]["titleUrl"]}";
             
             currentPath = fullpath;
+
+            return $"{date.Year}-{month}-{day}-{dt.Rows[index]["titleUrl"]}";
         }
 
-        private static void MakeBlog(DataTable dt, string rootUrl)
+        private static void MakeBlog(DataTable dt)
         {
-            var url = rootUrl;
+            var url = "";
+            var fileName = "";
 
             for (int i = 0; i < dt.Rows.Count; i++)
             {
-                rootUrl = url;
+                url = "RootUrl";
 
                 var id = dt.Rows[i]["id"].ToString();
 
@@ -161,15 +168,15 @@ namespace GetDataFromServerAndSaveInFile
                 {
                     if (dt.Rows[i]["devblog"].ToString() == "True")
                     {
-                        MakePath(dt, i, "DevRootUrl");
-
+                        fileName = MakePath(dt, i, "DevRootUrl");
+                        
                         idWithPathsDevBlogs.Add(id, currentPath);
 
-                        rootUrl = "DevRootUrl";
+                        url = "DevRootUrl";
                     }
                     else
                     {
-                        MakePath(dt, i, rootUrl);
+                        fileName = MakePath(dt, i, "RootUrl");
 
                         if (idWithPathsBlogs.ContainsKey(id))
                             idWithPathsBlogs[id][1] = currentPath;
@@ -179,16 +186,16 @@ namespace GetDataFromServerAndSaveInFile
                 }
                 else
                 {
-                    MakePath(dt, i, rootUrl);
+                    fileName = MakePath(dt, i, "RootUrl");
 
                     idWithPathsBlogs.Add(id, new string[] { $"/de{currentPath}", "" });
                 }
 
                 if (CheckToIgnore(currentPath) <= -1)
                 {
-                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{currentPath}.md"))
+                    using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[url]}{fileName}.md"))
                     {
-                        SetHeader(sw, dt, i, currentPath);
+                        SetHeader(sw, dt, i);
                         ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
                     }
                 }
@@ -217,7 +224,7 @@ namespace GetDataFromServerAndSaveInFile
 
                     idWithPathsData.Add(dt.Rows[i]["id"].ToString(),path);
 
-                    var fullPath = $"{ConfigurationManager.AppSettings["RootUrl"]}{folder}";
+                    var fullPath = $"{ConfigurationManager.AppSettings["ContentRootUrl"]}{folder}";
 
                     CheckDirectory(fullPath);
 
@@ -300,7 +307,7 @@ namespace GetDataFromServerAndSaveInFile
 
                         using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[rootUrl]}{folderPath}{fileName}.md"))
                         {
-                            SetHeader(sw, dt, i, helpPath);
+                            SetHeader(sw, dt, i);
                             ContentSeperatorAndSetter(sw, dt.Rows[i]["content"].ToString());
                         }
                     }
@@ -313,7 +320,7 @@ namespace GetDataFromServerAndSaveInFile
             }
         }
 
-        private static void SetHeader(StreamWriter sw, DataTable dt,int index, string fullPath)
+        private static void SetHeader(StreamWriter sw, DataTable dt,int index)
         {
             var titleConvert = dt.Rows[index]["title"].ToString().Replace(":", " - ");
 
@@ -321,7 +328,7 @@ namespace GetDataFromServerAndSaveInFile
 
             if (blog)
             {
-                var teaser = dt.Rows[index]["teaser"].ToString().Replace(":", " - ").Replace("\n", " ");
+                var teaser = dt.Rows[index]["teaser"].ToString().Replace(":", " - ").Replace("\n", " ").Replace("<",string.Empty).Replace(">",string.Empty);
                 var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-MM-dd");
                 var language = dt.Rows[index]["SourceCultureName"].ToString().Substring(0, 2);
                 var reference = "";
@@ -329,7 +336,7 @@ namespace GetDataFromServerAndSaveInFile
 
                 sw.WriteLine("layout: blog");
                 sw.WriteLine($"title: {titleConvert}");
-                sw.WriteLine($"teaser: {teaser}");
+                sw.WriteLine($"excerpt: {teaser}");
                 sw.WriteLine($"author: {dt.Rows[index]["name"]}");
                 sw.WriteLine($"date: {date}");
 
@@ -390,14 +397,14 @@ namespace GetDataFromServerAndSaveInFile
                 sw.WriteLine("layout: page");
                 sw.WriteLine($"title: {titleConvert}");
 
-			    if (fullPath == "/home/")
-				    fullPath = "/";
+			    if (currentPath == "/home/")
+				    currentPath = "/";
             }
 
             if (german)
-                sw.WriteLine($"permalink: /de{fullPath}");
+                sw.WriteLine($"permalink: /de{currentPath}");
             else
-                sw.WriteLine($"permalink: {fullPath}");
+                sw.WriteLine($"permalink: {currentPath}");
 
             sw.WriteLine("---");
             sw.WriteLine();
