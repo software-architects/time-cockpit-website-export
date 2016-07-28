@@ -354,6 +354,20 @@ namespace GetDataFromServerAndSaveInFile
                 sw.WriteLine($"bannerimage: {imageUrl}");
                 sw.WriteLine($"lang: {language}");
 
+                var tags = dt.Rows[index]["tags"].ToString().Split(',');
+
+                var tagString = "[";
+
+                for (int i = 0; i < tags.Length; i++)
+                {
+                    if (tags.Length - 1 != i)
+                        tagString += $"{tags[i]},";
+                    else
+                        tagString += tags[i];
+                }
+
+                sw.WriteLine($"tags: {tagString}]");
+
                 if (german)
                 {
                     if ((reference = idWithPathsBlogs[dt.Rows[index]["id"].ToString()][1]) == string.Empty)
@@ -363,22 +377,6 @@ namespace GetDataFromServerAndSaveInFile
                 }
                 else
                 {
-                    var tags = dt.Rows[index]["tags"].ToString().Split(',');
-
-                    var tagString = "[";
-
-                    for (int i = 0; i < tags.Length; i++)
-                    {
-                        if (tags.Length-1 != i)
-                            tagString += $"{tags[i]},";
-                        else
-                            tagString += tags[i];
-                    }
-
-                    tagString += "]";
-
-                    sw.WriteLine($"tags: {tagString}");
-
                     if (dt.Rows[index]["devblog"].ToString() == "False")
                     {
                         if ((reference = idWithPathsBlogs[dt.Rows[index]["id"].ToString()][0]) == string.Empty)
