@@ -40,8 +40,8 @@ namespace GetDataFromServerAndSaveInFile
 
                 var mediaFile = @"select id, folderPath, fileName from Composite_Data_Types_IMediaFileData_Published;";
 
-                var blogEntriesGerman = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.tags,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_de_AT p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
-                var blogEntriesEnglish = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.Teaser,p.tags,p.devblog,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_en_US p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
+                var blogEntriesGerman = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.imagesource,p.Teaser,p.tags,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_de_AT p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
+                var blogEntriesEnglish = @"SELECT p.id,p.TitleUrl,p.title,p.image,p.imagesource,p.Teaser,p.tags,p.devblog,p.date,p.Author,p.Content,p.SourceCultureName,pp.name FROM Composite_Community_Blog_Entries_en_US p inner join Composite_Community_Blog_Authors_Published pp on p.author = pp.id;";
 
                 using (var dataEnglish = new SqlDataAdapter(pageEnglish, conn))
                 using (var urlDataEnglish = new SqlDataAdapter(urlEnglish, conn))
@@ -235,6 +235,7 @@ namespace GetDataFromServerAndSaveInFile
                     {
                         var data = client.DownloadData(dt.Rows[i]["id"].ToString());
                         File.WriteAllBytes(fullPath, data);
+                        Console.WriteLine(i);
                     }
                 }
             }
@@ -330,6 +331,22 @@ namespace GetDataFromServerAndSaveInFile
             if (blog)
             {
                 var teaser = dt.Rows[index]["teaser"].ToString().Replace(":", " - ").Replace("\n", " ").Replace("<",string.Empty).Replace(">",string.Empty);
+                var imagesource = dt.Rows[index]["imagesource"].ToString().Replace(":", " - ");
+                MatchCollection replacedString = null;
+
+                if (imagesource != string.Empty)
+                {
+                    var originalString = Regex.Matches(imagesource, @"(<a)(.|\W|\s|\x22)+?(<\/a>)");
+
+                    replacedString = originalString;
+
+                    for(int i = 0; i < originalString.Count;i++)
+                    {
+                        var help = Regex.Replace(replacedString[i].ToString()," - ", ":");
+                        imagesource = imagesource.Replace(originalString[i].ToString(), help);
+                    }
+                }
+
                 var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-MM-dd");
                 var language = dt.Rows[index]["SourceCultureName"].ToString().Substring(0, 2);
                 var reference = "";
@@ -352,6 +369,7 @@ namespace GetDataFromServerAndSaveInFile
                 }
 
                 sw.WriteLine($"bannerimage: {imageUrl}");
+                sw.WriteLine($"bannerimagesource: {imagesource}");
                 sw.WriteLine($"lang: {language}");
 
                 var tags = dt.Rows[index]["tags"].ToString().Split(',');
