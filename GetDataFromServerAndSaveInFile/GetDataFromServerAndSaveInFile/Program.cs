@@ -20,10 +20,12 @@ namespace GetDataFromServerAndSaveInFile
         private static Dictionary<string, string> idWithPathsPagesGerman = new Dictionary<string, string>();
         private static Dictionary<string, string> idWithPathsPagesEnglish = new Dictionary<string, string>();
         private static Dictionary<string, string> idWithPathsData = new Dictionary<string, string>();
+        private static Dictionary<string, string[]> idWithPathsGermanEnglish = new Dictionary<string, string[]>();
         private static Dictionary<string, string[]> idWithPathsBlogs = new Dictionary<string, string[]>();
         private static Dictionary<string, string> idWithPathsDevBlogs = new Dictionary<string, string>();
         private static string[] filesToIgnore;
-        private static string currentPath;
+        private static string currentPathBlog;
+        private static string currentPathPage;
 
         public static void Main(string[] args)
         {
@@ -70,11 +72,13 @@ namespace GetDataFromServerAndSaveInFile
                         dataBlogEntriesGerman.Fill(dataTableBlogEntriesGerman);
                         dataBlogEntriesEnglish.Fill(dataTableBlogEntriesEnglish);
 
-                        FillDictionary(dataTableGerman, urlDataTableGerman, idWithPathsPagesGerman);
+                        FillDictionaryHtml(dataTableGerman, urlDataTableGerman, idWithPathsPagesGerman);
+                        FillDictionaryBlog(dataTableBlogEntriesGerman);
 
                         german = false;
 
-                        FillDictionary(dataTableEnglish, urlDataTableEnglish, idWithPathsPagesEnglish);
+                        FillDictionaryHtml(dataTableEnglish, urlDataTableEnglish, idWithPathsPagesEnglish);
+                        FillDictionaryBlog(dataTableBlogEntriesEnglish);
 
                         german = true;
 
@@ -148,9 +152,42 @@ namespace GetDataFromServerAndSaveInFile
 
             var fullpath = $"{path}/{dt.Rows[index]["titleUrl"]}";
             
-            currentPath = fullpath;
+            currentPathBlog = fullpath;
 
             return $"{date.Year}-{month}-{day}-{dt.Rows[index]["titleUrl"]}";
+        }
+
+        private static void FillDictionaryBlog(DataTable dt)
+        {
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                var id = dt.Rows[i]["id"].ToString();
+
+                if (!german)
+                {
+                    if (dt.Rows[i]["devblog"].ToString() == "True")
+                    {
+                        MakePath(dt, i, "DevRootUrl");
+
+                        idWithPathsDevBlogs.Add(id, currentPathBlog);
+                    }
+                    else
+                    {
+                        MakePath(dt, i, "RootUrl");
+
+                        if (idWithPathsBlogs.ContainsKey(id))
+                            idWithPathsBlogs[id][1] = currentPathBlog;
+                        else
+                            idWithPathsBlogs.Add(id, new string[] { "", currentPathBlog });
+                    }
+                }
+                else
+                {
+                    MakePath(dt, i, "RootUrl");
+
+                    idWithPathsBlogs.Add(id, new string[] { $"/de{currentPathBlog}", "" });
+                }
+            }
         }
 
         private static void MakeBlog(DataTable dt)
@@ -170,29 +207,15 @@ namespace GetDataFromServerAndSaveInFile
                     if (dt.Rows[i]["devblog"].ToString() == "True")
                     {
                         fileName = MakePath(dt, i, "DevRootUrl");
-                        
-                        idWithPathsDevBlogs.Add(id, currentPath);
-
                         url = "DevRootUrl";
                     }
                     else
-                    {
                         fileName = MakePath(dt, i, "RootUrl");
-
-                        if (idWithPathsBlogs.ContainsKey(id))
-                            idWithPathsBlogs[id][1] = currentPath;
-                        else
-                            idWithPathsBlogs.Add(id, new string[] { "", currentPath });
-                    }
                 }
                 else
-                {
                     fileName = MakePath(dt, i, "RootUrl");
 
-                    idWithPathsBlogs.Add(id, new string[] { $"/de{currentPath}", "" });
-                }
-
-                if (CheckToIgnore(currentPath) <= -1)
+                if (CheckToIgnore(currentPathBlog) <= -1)
                 {
                     using (var sw = new StreamWriter($"{ConfigurationManager.AppSettings[url]}{fileName}.md"))
                     {
@@ -241,7 +264,7 @@ namespace GetDataFromServerAndSaveInFile
             }
         }   
 
-        private static void FillDictionary(DataTable dt, DataTable urlDt, Dictionary<string,string> pages)
+        private static void FillDictionaryHtml(DataTable dt, DataTable urlDt, Dictionary<string,string> pages)
         {
             for (int i = 0; i < dt.Rows.Count; i++)
             {
@@ -250,7 +273,6 @@ namespace GetDataFromServerAndSaveInFile
                 var splitUrl = GetUrlTitle(foundrow[0]["urltitle"].ToString());
 
                 var folderPath = "/";
-                var helpPath = "";
                 var fileName = "";
 
                 if (splitUrl.Length == 1)
@@ -266,12 +288,27 @@ namespace GetDataFromServerAndSaveInFile
                 }
 
                 if (german)
-                    helpPath = $"/de{folderPath}{fileName}/";
+                    currentPathPage = $"/de{folderPath}{fileName}/";
                 else
-                    helpPath = $"{folderPath}{fileName}/";
+                    currentPathPage = $"{folderPath}{fileName}/";
 
                 if (!pages.ContainsKey(foundrow[0]["id"].ToString()))
-                    pages.Add(foundrow[0]["id"].ToString(), helpPath);
+                    pages.Add(foundrow[0]["id"].ToString(), currentPathPage);
+
+                var index = dt.Rows[i]["id"].ToString();
+
+                if(german)
+                {
+                    if (!idWithPathsGermanEnglish.ContainsKey(index))
+                        idWithPathsGermanEnglish.Add(index, new string[] { $"{currentPathPage}", "" });
+                }
+                else
+                {
+                    if (idWithPathsGermanEnglish.ContainsKey(index))
+                        idWithPathsGermanEnglish[index][1] = currentPathPage;
+                    else
+                        idWithPathsGermanEnglish.Add(index, new string[] { "", currentPathPage });
+                }
             }
         }
 
@@ -299,7 +336,7 @@ namespace GetDataFromServerAndSaveInFile
                 }
                 helpPath = $"{folderPath}{fileName}/";
 
-                currentPath = helpPath;
+                currentPathBlog = helpPath;
 
                 if (CheckToIgnore(helpPath) <= -1)
                 {
@@ -325,6 +362,8 @@ namespace GetDataFromServerAndSaveInFile
         private static void SetHeader(StreamWriter sw, DataTable dt,int index)
         {
             var titleConvert = dt.Rows[index]["title"].ToString().Replace(":", " - ");
+            var reference = "";
+            var isEmptyReference = true;
 
             sw.WriteLine("---");
 
@@ -349,8 +388,6 @@ namespace GetDataFromServerAndSaveInFile
 
                 var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-MM-dd");
                 var language = dt.Rows[index]["SourceCultureName"].ToString().Substring(0, 2);
-                var reference = "";
-                var isEmptyReference = true;
 
                 sw.WriteLine("layout: blog");
                 sw.WriteLine($"title: {titleConvert}");
@@ -404,22 +441,44 @@ namespace GetDataFromServerAndSaveInFile
                     }
                 }
 
-                if(!isEmptyReference)
+                if (!isEmptyReference)
                     sw.WriteLine($"ref: {reference}");
+                else if(isEmptyReference)
+                    sw.WriteLine($"ref: ");
             }
             else
             {
                 sw.WriteLine("layout: page");
                 sw.WriteLine($"title: {titleConvert}");
 
-			    if (currentPath == "/home/")
-				    currentPath = "/";
+			    if (currentPathBlog == "/home/")
+				    currentPathBlog = "/";
+
+                if (german)
+                {
+                    if ((reference = idWithPathsGermanEnglish[dt.Rows[index]["id"].ToString()][1]) == string.Empty)
+                        isEmptyReference = true;
+                    else
+                        isEmptyReference = false;
+                }
+                else
+                {
+                    if ((reference = idWithPathsGermanEnglish[dt.Rows[index]["id"].ToString()][0]) == string.Empty)
+                        isEmptyReference = true;
+                    else
+                        isEmptyReference = false;
+                }
+
+                if (!isEmptyReference)
+                    sw.WriteLine($"ref: {reference}");
+                else
+                    sw.WriteLine($"ref: ");
             }
 
             if (german)
-                sw.WriteLine($"permalink: /de{currentPath}");
+                sw.WriteLine($"permalink: /de{currentPathBlog}");
             else
-                sw.WriteLine($"permalink: {currentPath}");
+                sw.WriteLine($"permalink: {currentPathBlog}");
 
             sw.WriteLine("---");
             sw.WriteLine();
@@ -483,7 +542,7 @@ namespace GetDataFromServerAndSaveInFile
             }
 
             if(hasFunction)
-                Console.WriteLine($"{currentPath} beinhaltet funktion");
+                Console.WriteLine($"{currentPathBlog} beinhaltet funktion");
         }
 
         private static bool PrintAllFunction(string content)
