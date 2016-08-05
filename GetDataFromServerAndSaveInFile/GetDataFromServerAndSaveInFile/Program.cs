@@ -20,6 +20,7 @@ namespace GetDataFromServerAndSaveInFile
         private static Dictionary<string, string> idWithPathsPagesGerman = new Dictionary<string, string>();
         private static Dictionary<string, string> idWithPathsPagesEnglish = new Dictionary<string, string>();
         private static Dictionary<string, string> idWithPathsData = new Dictionary<string, string>();
+        //id mit englisch und deutsch titel
         private static Dictionary<string, string[]> idWithPathsGermanEnglish = new Dictionary<string, string[]>();
         private static Dictionary<string, string[]> idWithPathsBlogs = new Dictionary<string, string[]>();
         private static Dictionary<string, string> idWithPathsDevBlogs = new Dictionary<string, string>();
@@ -63,15 +64,14 @@ namespace GetDataFromServerAndSaveInFile
                     {
                         dataEnglish.Fill(dataTableEnglish);
                         urlDataEnglish.Fill(urlDataTableEnglish);
-
                         dataGerman.Fill(dataTableGerman);
                         urlDataGerman.Fill(urlDataTableGerman);
-
                         urlDataMediaFile.Fill(urlDataTableMediaFile);
-
                         dataBlogEntriesGerman.Fill(dataTableBlogEntriesGerman);
                         dataBlogEntriesEnglish.Fill(dataTableBlogEntriesEnglish);
 
+
+                        //Just fills the dictionarys 
                         FillDictionaryHtml(dataTableGerman, urlDataTableGerman, idWithPathsPagesGerman);
                         FillDictionaryBlog(dataTableBlogEntriesGerman);
 
@@ -86,22 +86,25 @@ namespace GetDataFromServerAndSaveInFile
 
                         AddFilesToIgnore();
 
+                        //Download all documents
                         DownloadData(urlDataTableMediaFile);
 
+                        //Make blogs
                         MakeBlog(dataTableBlogEntriesGerman);
 
                         german = false;
 
                         MakeBlog(dataTableBlogEntriesEnglish);
 
-                        //german = true;
-                        //blog = false;
+                        german = true;
+                        blog = false;
 
-                        //MakeHtml(dataTableGerman, urlDataTableGerman, "DeRootUrl");
+                        //Make html
+                        MakeHtml(dataTableGerman, urlDataTableGerman, "DeRootUrl");
 
-                        //german = false;
+                        german = false;
 
-                        //MakeHtml(dataTableEnglish, urlDataTableEnglish, "EnRootUrl");
+                        MakeHtml(dataTableEnglish, urlDataTableEnglish, "EnRootUrl");
                     }
                 }
             }
@@ -128,6 +131,13 @@ namespace GetDataFromServerAndSaveInFile
             return check;
         } 
 
+        /// <summary>
+        /// Makes the current path for a blog
+        /// </summary>
+        /// <param name="dt"></param>
+        /// <param name="index"></param>
+        /// <param name="rootUrl"></param>
+        /// <returns>filename</returns>
         private static string MakePath(DataTable dt, int index, string rootUrl)
         {
             DateTime date = Convert.ToDateTime(dt.Rows[index]["date"]);
@@ -148,15 +158,17 @@ namespace GetDataFromServerAndSaveInFile
 
             path += $"{date.Year}/{month}/{day}";
 
-            CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}"); //{path}
+            CheckDirectory($"{ConfigurationManager.AppSettings[rootUrl]}"); //erstellen des ordners
 
-            var fullpath = $"{path}/{dt.Rows[index]["titleUrl"]}";
-            
-            currentPathBlog = fullpath;
+            currentPathBlog = $"{path}/{dt.Rows[index]["titleUrl"]}";
 
             return $"{date.Year}-{month}-{day}-{dt.Rows[index]["titleUrl"]}";
         }
 
+        /// <summary>
+        /// Wird nur aufgerufen um das Dicitionary zu füllen
+        /// </summary>
+        /// <param name="dt"></param>
         private static void FillDictionaryBlog(DataTable dt)
         {
             for (int i = 0; i < dt.Rows.Count; i++)
@@ -190,6 +202,10 @@ namespace GetDataFromServerAndSaveInFile
             }
         }
 
+        /// <summary>
+        /// Makes the blog with header and content (same code like FillDictionaryBlog
+        /// </summary>
+        /// <param name="dt"></param>
         private static void MakeBlog(DataTable dt)
         {
             var url = "";
@@ -226,6 +242,10 @@ namespace GetDataFromServerAndSaveInFile
             }
         }
 
+        /// <summary>
+        /// Alle dateien werden hier runtergeladen
+        /// </summary>
+        /// <param name="dt"></param>
         private static void DownloadData(DataTable dt)
         {
             using (var client = new WebClient())
@@ -264,6 +284,12 @@ namespace GetDataFromServerAndSaveInFile
             }
         }   
 
+        /// <summary>
+        /// Fills the dictionary for the html page
+        /// </summary>
+        /// <param name="dt"></param>
+        /// <param name="urlDt"></param>
+        /// <param name="pages"></param>
         private static void FillDictionaryHtml(DataTable dt, DataTable urlDt, Dictionary<string,string> pages)
         {
             for (int i = 0; i < dt.Rows.Count; i++)
@@ -312,6 +338,12 @@ namespace GetDataFromServerAndSaveInFile
             }
         }
 
+        /// <summary>
+        /// Makes the html page 
+        /// </summary>
+        /// <param name="dt"></param>
+        /// <param name="urlDt"></param>
+        /// <param name="rootUrl"></param>
         private static void MakeHtml(DataTable dt, DataTable urlDt, string rootUrl)
         {
             for (int i = 0; i < dt.Rows.Count; i++)
@@ -359,6 +391,12 @@ namespace GetDataFromServerAndSaveInFile
             }
         }
 
+        /// <summary>
+        /// Write the full header to file
+        /// </summary>
+        /// <param name="sw"></param>
+        /// <param name="dt"></param>
+        /// <param name="index"></param>
         private static void SetHeader(StreamWriter sw, DataTable dt,int index)
         {
             var titleConvert = dt.Rows[index]["title"].ToString().Replace(":", " - ");
@@ -370,22 +408,6 @@ namespace GetDataFromServerAndSaveInFile
             if (blog)
             {
                 var teaser = dt.Rows[index]["teaser"].ToString().Replace(":", " - ").Replace("\n", " ").Replace("<",string.Empty).Replace(">",string.Empty);
-                var imagesource = dt.Rows[index]["imagesource"].ToString().Replace(":", " - ");
-                MatchCollection replacedString = null;
-
-                if (imagesource != string.Empty)
-                {
-                    var originalString = Regex.Matches(imagesource, @"(<a)(.|\W|\s|\x22)+?(<\/a>)");
-
-                    replacedString = originalString;
-
-                    for(int i = 0; i < originalString.Count;i++)
-                    {
-                        var help = Regex.Replace(replacedString[i].ToString()," - ", ":");
-                        imagesource = imagesource.Replace(originalString[i].ToString(), help);
-                    }
-                }
-
                 var date = Convert.ToDateTime(dt.Rows[index]["date"]).ToString("yyyy-MM-dd");
                 var language = dt.Rows[index]["SourceCultureName"].ToString().Substring(0, 2);
 
@@ -397,6 +419,7 @@ namespace GetDataFromServerAndSaveInFile
 
                 var imageUrl = "";
 
+                //gets the image url from the guid of the image
                 if (dt.Rows[index]["image"].ToString() != string.Empty)
                 {
                     var guid = dt.Rows[index]["image"].ToString().Substring(13);
@@ -406,9 +429,28 @@ namespace GetDataFromServerAndSaveInFile
                 }
 
                 sw.WriteLine($"bannerimage: {imageUrl}");
+
+                var imagesource = dt.Rows[index]["imagesource"].ToString().Replace(":", " - ");
+                MatchCollection replacedString = null;
+
+                //Replace the - in the html tag
+                if (imagesource != string.Empty)
+                {
+                    var originalString = Regex.Matches(imagesource, @"(<a)(.|\W|\s|\x22)+?(<\/a>)");
+
+                    replacedString = originalString;
+
+                    for (int i = 0; i < originalString.Count; i++)
+                    {
+                        var help = Regex.Replace(replacedString[i].ToString(), " - ", ":");
+                        imagesource = imagesource.Replace(originalString[i].ToString(), help);
+                    }
+                }
+
                 sw.WriteLine($"bannerimagesource: {imagesource}");
                 sw.WriteLine($"lang: {language}");
 
+                //Adds the all tags to header
                 var tags = dt.Rows[index]["tags"].ToString().Split(',');
 
                 var tagString = "[";
@@ -423,6 +465,7 @@ namespace GetDataFromServerAndSaveInFile
 
                 sw.WriteLine($"tags: {tagString}]");
 
+                //Check if blog has references
                 if (german)
                 {
                     if ((reference = idWithPathsBlogs[dt.Rows[index]["id"].ToString()][1]) == string.Empty)
@@ -454,6 +497,7 @@ namespace GetDataFromServerAndSaveInFile
 			    if (currentPathBlog == "/home/")
 				    currentPathBlog = "/";
 
+                //Checks if page has references
                 if (german)
                 {
                     if ((reference = idWithPathsGermanEnglish[dt.Rows[index]["id"].ToString()][1]) == string.Empty)
@@ -475,6 +519,7 @@ namespace GetDataFromServerAndSaveInFile
                     sw.WriteLine($"ref: ");
             }
 
+            //Prints the permalink
             if (german)
                 sw.WriteLine($"permalink: /de{currentPathBlog}");
             else
@@ -484,6 +529,11 @@ namespace GetDataFromServerAndSaveInFile
             sw.WriteLine();
         }
 
+        /// <summary>
+        /// Remove the namespace
+        /// </summary>
+        /// <param name="document"></param>
+        /// <returns></returns>
         private static XDocument RemoveNameSpace(XDocument document)
         {
             foreach (XElement e in document.Root.DescendantsAndSelf())
@@ -500,6 +550,11 @@ namespace GetDataFromServerAndSaveInFile
             return document;
         }
 
+        /// <summary>
+        /// Checks the content and replace it with new
+        /// </summary>
+        /// <param name="sw"></param>
+        /// <param name="content"></param>
         private static void ContentSeperatorAndSetter(StreamWriter sw, string content)
         {
             var document = XDocument.Parse(content);
@@ -519,13 +574,16 @@ namespace GetDataFromServerAndSaveInFile
             {
                 var xeString = xe.ToString();
 
+                //Checks for any media (file) hyperlink
                 xeString = MakeHyperLink(xeString, @"~?/media\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsData);
 
+                //Checks all links to other pages
                 if (german)
                     xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPagesGerman);
                 else
                     xeString = MakeHyperLink(xeString, @"~?/page\([A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12}\)", idWithPathsPagesEnglish);
 
+                //Checks if blog has any code in the content
                 if (blog)
                     xeString = MakeHighLight(xeString);
 
@@ -545,6 +603,11 @@ namespace GetDataFromServerAndSaveInFile
                 Console.WriteLine($"{currentPathBlog} beinhaltet funktion");
         }
 
+        /// <summary>
+        /// Just for checking if page have any function tags
+        /// </summary>
+        /// <param name="content"></param>
+        /// <returns></returns>
         private static bool PrintAllFunction(string content)
         {
             var result1 = Regex.IsMatch(content, @"(<function\s{1}name=\x22)(.|\W|\s|\x22)+?(<\/function>)");
@@ -555,10 +618,16 @@ namespace GetDataFromServerAndSaveInFile
                 return false;
         }
 
+        /// <summary>
+        /// Replace the code in a page to display it in jekyll
+        /// </summary>
+        /// <param name="xeString"></param>
+        /// <returns></returns>
         private static string MakeHighLight(string xeString)
         {
             var fullCode = xeString;
 
+            //Check if function have syntaxhighligher in tag
             var allResults = Regex.Matches(fullCode, @"(<function\s{1}name=\x22Composite\.Web\.Html\.SyntaxHighlighter\x22)(.|\W|\s)+?(<\/function>)");
             var code = "";
 
@@ -566,6 +635,7 @@ namespace GetDataFromServerAndSaveInFile
             {
                 var help = item.ToString();
 
+                //Gets the param for source code and code type 
                 var paramNodes = Regex.Matches(help, @"(<param\s{1}name=\x22SourceCode\x22).+?(\/>)");
                 var paramCodeType = Regex.Matches(help, @"(<param\s{1}name=\x22CodeType\x22).+?(\/>)");
 
@@ -573,14 +643,17 @@ namespace GetDataFromServerAndSaveInFile
                 {
                     foreach (var singleParam in paramNodes)
                     {
+                        //Gets the value of the params
                         var valueNodes = Regex.Matches(singleParam.ToString(), @"(value=\W?).+?(\x22)");
                         var valueCodeType = Regex.Matches(paramCodeType[0].ToString(), @"(value=\W?).+?(\x22)");
 
                         foreach (var singleValue in valueNodes)
                         {
+                            //Checks if source code and code type is in this format
                             code = Regex.Matches(singleValue.ToString(), @"(\x22).+?(\x22)")[0].Value;
                             var codeType = Regex.Matches(valueCodeType[0].ToString(), @"(\x22).+?(\x22)")[0].Value;
 
+                            //remove the " 
                             if (code.StartsWith("\x22") && code.EndsWith("\x22"))
                             {
                                 code = code.Substring(1, code.Length - 1);
@@ -590,6 +663,7 @@ namespace GetDataFromServerAndSaveInFile
                             codeType = codeType.Substring(1, codeType.Length - 1);
                             codeType = codeType.Remove(codeType.Length - 1);
 
+                            //Replacing chars
                             code = code.Replace("&#xA;", "\n").Replace("&#xD;", "\r").Replace("&quot;", "\x22").Replace("&#x9;", "    ").Replace("&lt;", "<").Replace("&gt;", ">").Replace("&amp;", "&");
 
                             var highlight = "{% highlight "+codeType+" %}";
@@ -606,6 +680,13 @@ namespace GetDataFromServerAndSaveInFile
             return xeString;
         }
 
+        /// <summary>
+        /// Replaces the old hyperlinks to another page or image for jekyll
+        /// </summary>
+        /// <param name="content"></param>
+        /// <param name="pattern"></param>
+        /// <param name="ids"></param>
+        /// <returns></returns>
         private static string MakeHyperLink(string content,string pattern, Dictionary<string,string> ids)
         {
             var guid = Regex.Matches(content, pattern);
@@ -618,6 +699,7 @@ namespace GetDataFromServerAndSaveInFile
                 {
                     var idString = id.ToString();
 
+                    //Remove the ~
                     if (idString.StartsWith("~"))
                         idString = idString.Substring(1);
 
@@ -635,18 +717,32 @@ namespace GetDataFromServerAndSaveInFile
             }
         }
 
+        /// <summary>
+        /// Checks if directory exists
+        /// </summary>
+        /// <param name="path"></param>
         private static void CheckDirectory(string path)
         {
             if (!Directory.Exists(path))
                 Directory.CreateDirectory(path);
         }
 
+        /// <summary>
+        /// Checks if file exists
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
         private static bool CheckFile(string path)
         {
             if (File.Exists(path)) return true;
             else return false;
         }
 
+        /// <summary>
+        /// Split the title
+        /// </summary>
+        /// <param name="urlTitle"></param>
+        /// <returns></returns>
         private static string[] GetUrlTitle(string urlTitle)
         {
             return Regex.Split(urlTitle,"/");
